@@ -50,6 +50,10 @@ int main(int argc,char **argv) {
     try {
         check(argc==4,"Usage: obs-smoke plugin.dll data-dir config-dir");
         qputenv("QT_QPA_PLATFORM","minimal:enable_fonts");
+#ifdef __APPLE__
+        // The native Mac style needs Cocoa; these CI hosts use the minimal platform.
+        qputenv("QT_STYLE_OVERRIDE", "Fusion");
+#endif
         QApplication app(argc,argv);
         QWidget window;
         auto *frontend = new TestFrontend(window); // OBS takes ownership.

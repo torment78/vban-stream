@@ -72,6 +72,10 @@ int main(int argc, char **argv) {
         constexpr speaker_layout layouts[]{SPEAKERS_UNKNOWN, SPEAKERS_MONO, SPEAKERS_STEREO,
             SPEAKERS_2POINT1, SPEAKERS_4POINT0, SPEAKERS_4POINT1, SPEAKERS_5POINT1, SPEAKERS_7POINT1, SPEAKERS_7POINT1};
         qputenv("QT_QPA_PLATFORM", "minimal:enable_fonts");
+#ifdef __APPLE__
+        // The native Mac style needs Cocoa; these CI hosts use the minimal platform.
+        qputenv("QT_STYLE_OVERRIDE", "Fusion");
+#endif
         QApplication app(argc, argv);
         QWidget window;
         auto *frontend = new TestFrontend(window);

@@ -86,6 +86,10 @@ int main(int argc,char **argv){
  try {
     check(argc==4,"Expected DLL, data and isolated config paths");
     qputenv("QT_QPA_PLATFORM","minimal:enable_fonts");
+#ifdef __APPLE__
+        // The native Mac style needs Cocoa; these CI hosts use the minimal platform.
+        qputenv("QT_STYLE_OVERRIDE", "Fusion");
+#endif
     QApplication app(argc,argv);
     check(vban::net::startup()==0,"Socket");
     Sink left("127.0.0.1"),right(test_second_ip);
