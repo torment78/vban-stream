@@ -59,7 +59,7 @@ def validate():
     run("codesign","--verify","--strict",bundle)
     with (bundle/"Contents/Info.plist").open("rb") as stream:
         executable=bundle/"Contents/MacOS"/plistlib.load(stream)["CFBundleExecutable"]
-    run("lipo","-verify_arch","arm64","x86_64",executable)
+    run("lipo",executable,"-verify_arch","arm64","x86_64")
     env=dict(os.environ)
     deps=ROOT/".deps"
     qt=deps/"obs-deps-qt6-2025-07-11-universal"
