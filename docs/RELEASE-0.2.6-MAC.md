@@ -28,7 +28,10 @@ if the installer is blocked.
 Windows audio regressions are checked with Visual Studio 2026. Mac automated
 validation covers UDP reception and returns, native OBS host loading and UI,
 1-8 incoming channels, and PCM16/24. See the linked GitHub Actions run for the exact
-results and architectures completed before publication.
+results and architectures completed before publication. The virtual Mac integration
+hosts use a 200 ms return buffer to accommodate measured host scheduling delays.
+The default remains 60 ms; deterministic timing tests cover a 45 ms callback delay
+within that default buffer. Real Mac latency and dropout behavior still need testing.
 
 Real OBS GUI use and sustained LAN listening remain tester work. This is a
 pre-release, and the existing Windows 0.2.5 downloads are unchanged.

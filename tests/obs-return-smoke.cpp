@@ -3,8 +3,11 @@
 #include "worker-platform.hpp"
 #ifdef __APPLE__
 static constexpr auto test_second_ip = "127.0.0.1";
+// Virtual Mac runners can deliver callbacks over 70 ms late before injected delay.
+static constexpr int integration_buffer_ms = 200;
 #else
 static constexpr auto test_second_ip = "127.0.0.2";
+static constexpr int integration_buffer_ms = 60;
 #endif
 #include "vban-protocol.hpp"
 #include <obs.h>
@@ -218,7 +221,9 @@ int main(int argc,char **argv){
     check(saved.value("returns").toArray().size()==2 &&
           saved.value("returns").toArray()[1].toObject().value("stream_name")=="MONITOR-B","Return settings persist");
     check(saved.value("slots").toArray()[0].toObject().value("stream_name")=="KEEP","Saving returns preserves eight inputs");
+    buffer->setValue(integration_buffer_ms);buttons->button(QDialogButtonBox::Apply)->click();
     auto run=[&](int ms,float av=.1f,float bv=.2f,uint32_t b_rate=48000,bool mono=false){
+        ms+=integration_buffer_ms-60; // Keep the same observation window after the selected latency.
         left.read();right.read();left.packets.clear();right.packets.clear();
         const auto sample_start=os_gettime_ns();
         drive_audio(app,left,right,ms/10,[&](int i){
@@ -340,7 +345,7 @@ int main(int argc,char **argv){
     check(config.open(QIODevice::ReadOnly),"Read buffer settings");
     saved=QJsonDocument::fromJson(config.readAll()).object();config.close();
     check(saved.value("return_buffer_ms").toInt()==100,"Edited buffer persists");
-    buffer->setValue(60);buttons->button(QDialogButtonBox::Apply)->click();
+    buffer->setValue(integration_buffer_ms);buttons->button(QDialogButtonBox::Apply)->click();
     for(auto *source:extra){obs_source_dec_active(source);obs_source_release(source);}
     obs_wait_for_destroy_queue();
     obs_source_set_volume(b,.25f);
