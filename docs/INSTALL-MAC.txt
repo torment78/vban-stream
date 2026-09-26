@@ -11,7 +11,7 @@ INSTALL WITH THE PKG
 2. Open vban-stream-0.2.6-macos-universal-test.pkg and follow the installer.
 3. Install for your current user. The plugin goes here:
    ~/Library/Application Support/obs-studio/plugins/obs-vban-audio.plugin
-4. Restart OBS. Open Tools > VBAN Stream.
+4. Restart OBS. Open Tools > VBAN Stream Settings.
 
 MANUAL ZIP INSTALL
 1. Quit OBS and extract the ZIP.
@@ -35,7 +35,7 @@ means it was not quarantined. Restart OBS after signing. Do not disable Gatekeep
 or change security settings for the entire computer.
 
 RECEIVE AUDIO
-Open Tools > VBAN Stream. Set the sender's IPv4 address, UDP port, and the exact
+Open Tools > VBAN Stream Settings. Set the sender's IPv4 address, UDP port, and the exact
 case-sensitive VBAN stream name. Enable an input and give it a friendly label.
 Apply the settings. Add a VBAN Stream source in OBS and choose that input.
 Each of the eight inputs can receive one stream containing one to eight channels.
@@ -45,7 +45,7 @@ numbered channel positions with OBS at 7.1, send eight channels and leave unused
 channels silent. Smaller layouts use OBS's normal surround conversion.
 
 SEND MONITOR RETURNS
-Open Tools > VBAN Stream. Select the Mac's local sender address from the network
+Open Tools > VBAN Stream Settings. Select the Mac's local sender address from the network
 dropdown (for example en0 plus its IPv4 address), or leave automatic routing.
 Enable return 1 and/or return 2. Set the receiver's destination IPv4 address,
 UDP port, stream name, and PCM16 or PCM24. Set matching values on the receiver.

@@ -61,7 +61,10 @@ function(_setup_obs_studio)
       -DENABLE_SCRIPTING:BOOL=OFF)
   elseif(OS_MACOS)
     set(_cmake_generator "Xcode")
-    set(_cmake_arch "-DCMAKE_OSX_ARCHITECTURES:STRING='arm64;x86_64'")
+    # A cache file keeps the architecture list in one value (no shell quoting).
+    set(_arch_cache "${CMAKE_CURRENT_BINARY_DIR}/obs-macos-architectures.cmake")
+    file(WRITE "${_arch_cache}" "set(CMAKE_OSX_ARCHITECTURES \"arm64;x86_64\" CACHE STRING \"\" FORCE)\n")
+    set(_cmake_arch -C "${_arch_cache}")
     set(_cmake_extra "-DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}")
   endif()
 
