@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "socket-platform.hpp"
+#include "worker-platform.hpp"
 #ifdef __APPLE__
 static constexpr auto test_second_ip = "127.0.0.1";
 #else
@@ -47,6 +48,7 @@ struct Sink {
         check(bind(socket,reinterpret_cast<sockaddr*>(&address),sizeof(address))==0,"Bind test sink");
         vban::net::Length n=sizeof(address);getsockname(socket,reinterpret_cast<sockaddr*>(&address),&n);port=ntohs(address.sin_port);
         check(vban::net::nonblocking(socket),"Nonblocking test socket");
+        check(vban::net::receive_buffer(socket)>=128*1024,"Test sink retains packets during UI repaints");
     }
     ~Sink(){vban::net::close(socket);}
     void read(){
@@ -70,6 +72,32 @@ struct Sink {
         return count?sum/count:0;
     }
 };
+// Real sources deliver audio independently of GUI painting. Keep synthetic sources
+// on that same model so a slow CI window repaint does not alter callback latency.
+template<class Produce> static void drive_audio(QApplication &app, Sink &left, Sink &right, int blocks, Produce produce) {
+    std::atomic<bool> done{false};
+    std::exception_ptr failure;
+    std::thread audio([&] {
+        try {
+            vban::WorkerPriority priority;
+            auto deadline=std::chrono::steady_clock::now();
+            for(int i=0;i<blocks;++i) {
+                produce(i);
+                deadline+=std::chrono::milliseconds(10);
+                std::this_thread::sleep_until(deadline);
+            }
+        } catch(...) { failure=std::current_exception(); }
+        done=true;
+    });
+    struct Join { std::thread &thread; ~Join(){if(thread.joinable())thread.join();} } join{audio};
+    while(!done.load()) {
+        left.read();right.read();app.processEvents();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    audio.join();
+    if(failure)std::rethrow_exception(failure);
+    left.read();right.read();
+}
 struct CaptureProbe {
     std::atomic<unsigned> calls{0};
     std::atomic<float> sample{0};
@@ -186,16 +214,12 @@ int main(int argc,char **argv){
     check(saved.value("slots").toArray()[0].toObject().value("stream_name")=="KEEP","Saving returns preserves eight inputs");
     auto run=[&](int ms,float av=.1f,float bv=.2f,uint32_t b_rate=48000,bool mono=false){
         left.read();right.read();left.packets.clear();right.packets.clear();
-        auto deadline=std::chrono::steady_clock::now();
         const auto sample_start=os_gettime_ns();
-        for(int i=0;i<ms/10;++i){
+        drive_audio(app,left,right,ms/10,[&](int i){
             // Audio timestamps follow sample duration, even if the CI scheduler wakes late.
             const auto ts=sample_start+static_cast<uint64_t>(i)*10000000ULL;
             output(a,av,ts);output(b,bv,ts,b_rate/100,b_rate,mono);
-            left.read();right.read();app.processEvents();
-            deadline+=std::chrono::milliseconds(10);std::this_thread::sleep_until(deadline);
-        }
-        left.read();right.read();
+        });
     };
     auto expect=[&](double expected,const char *message){
         const auto x=left.tail_mean(),y=right.tail_mean();
@@ -269,16 +293,13 @@ int main(int argc,char **argv){
         extra.push_back(source);
     }
     left.read();right.read();left.packets.clear();right.packets.clear();
-    auto next_tick=std::chrono::steady_clock::now();
     const auto audio_start=os_gettime_ns();
-    for(int i=0;i<200;++i){
+    drive_audio(app,left,right,200,[&](int i){
         // Sample timestamps advance by the audio duration, independent of callback scheduling jitter.
         const auto ts=audio_start+static_cast<uint64_t>(i)*10000000ULL;
         output(a,.1f,ts);output(b,.2f,ts);
         for(auto *source:extra)output(source,.01f,ts);
-        left.read();right.read();app.processEvents();
-        next_tick+=std::chrono::milliseconds(10);std::this_thread::sleep_until(next_tick);
-    }
+    });
     left.read();right.read();expect(.36,"Eight monitored sources preserve expected audio under steady load");
     for(auto *sink:{&left,&right}){
         check(sink->packets.size()>600,"Sustained two-return packet delivery");
@@ -294,15 +315,12 @@ int main(int argc,char **argv){
     }
     // Keep sample timestamps continuous while every callback arrives 45 ms late.
     left.read();right.read();left.packets.clear();right.packets.clear();
-    next_tick=std::chrono::steady_clock::now();
     const auto delayed_start=os_gettime_ns()-45000000ULL;
-    for(int i=0;i<120;++i){
+    drive_audio(app,left,right,120,[&](int i){
         const auto ts=delayed_start+static_cast<uint64_t>(i)*10000000ULL;
         output(a,.1f,ts);output(b,.2f,ts);
         for(auto *source:extra)output(source,.01f,ts);
-        left.read();right.read();app.processEvents();
-        next_tick+=std::chrono::milliseconds(10);std::this_thread::sleep_until(next_tick);
-    }
+    });
     left.read();right.read();expect(.36,"Return buffer absorbs delayed OBS source callbacks");
     for(auto *sink:{&left,&right}) {
         check(sink->packets.size()>300,"Delayed sources retain packet delivery");
