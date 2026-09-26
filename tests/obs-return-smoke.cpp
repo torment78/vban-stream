@@ -183,8 +183,16 @@ int main(int argc,char **argv){
     };
     auto expect=[&](double expected,const char *message){
         const auto x=left.tail_mean(),y=right.tail_mean();
-        if(std::fabs(x-expected)>.018 || std::fabs(y-expected)>.018)
+        if(std::fabs(x-expected)>.018 || std::fabs(y-expected)>.018) {
             std::cerr<<"Expected "<<expected<<", measured "<<x<<", "<<y<<"\n";
+            std::cerr<<"Packets: "<<left.packets.size()<<", "<<right.packets.size()
+                     <<"; active: "<<obs_source_active(a)<<", "<<obs_source_active(b)
+                     <<"; monitoring: "<<obs_source_get_monitoring_type(a)<<", "<<obs_source_get_monitoring_type(b)<<"\n";
+            for(int i=0;i<2;++i) {
+                const auto *status=dialog->findChild<QLabel*>(QString("return_%1_status").arg(i));
+                std::cerr<<status->text().toStdString()<<"\n"<<status->toolTip().toStdString()<<"\n";
+            }
+        }
         check(std::fabs(x-expected)<.018 && std::fabs(y-expected)<.018,message);
     };
     run(350);expect(.1,"Existing monitored source includes post-filter audio and fader gain; off source excluded");
