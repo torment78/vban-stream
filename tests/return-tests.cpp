@@ -188,6 +188,8 @@ int main() {
         vban::net::Length size=sizeof(peers[i]);
         const auto got=recvfrom(sockets[i],reinterpret_cast<char*>(buffer.data()),static_cast<int>(buffer.size()),0,
             reinterpret_cast<sockaddr*>(&peers[i]),&size);
+        if(got<=0) std::cerr << "Destination " << i << ": receive error=" << vban::net::error()
+            << ", transmitter=" << tx.status(i).detail << "\n";
         check(got>0,"Receive actual UDP return");return got;
     };
     tx.send(samples.data(),128,48000);

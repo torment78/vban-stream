@@ -231,8 +231,9 @@ void Transmitter::send(const float *stereo, size_t frames, uint32_t rate) {
         std::memcpy(packet.data()+8, d.config.stream_name.data(), d.config.stream_name.size());
         const auto sequence = sequences_[i]++;
         for (size_t b = 0; b < 4; ++b) packet[24+b] = static_cast<uint8_t>(sequence >> (b*8));
-        const auto sent = sendto(d.socket, reinterpret_cast<const char *>(packet.data()), static_cast<int>(size), 0,
-                                 reinterpret_cast<const sockaddr *>(&d.address), sizeof(d.address));
+        // The UDP socket is connected to its configured destination. Darwin rejects
+        // sendto() with an explicit destination on an already-connected UDP socket.
+        const auto sent = ::send(d.socket, reinterpret_cast<const char *>(packet.data()), static_cast<int>(size), 0);
         if (sent != static_cast<int>(size)) {
             ++state.errors; state.state = ReturnState::error;
             state.detail = "UDP send failed (Socket " + std::to_string(vban::net::error()) + ").";

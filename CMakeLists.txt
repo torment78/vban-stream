@@ -104,4 +104,8 @@ if(APPLE AND BUILD_TESTING)
   foreach(target obs-smoke obs-return-smoke obs-multichannel)
     target_compile_options(${target} PRIVATE -Wno-unused-parameter)
   endforeach()
+  foreach(target vban-tests return-tests obs-smoke obs-return-smoke obs-multichannel)
+    # Test hosts load pinned SDK frameworks outside an application bundle.
+    set_target_properties(${target} PROPERTIES XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME NO)
+  endforeach()
 endif()
