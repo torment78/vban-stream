@@ -187,8 +187,10 @@ int main(int argc,char **argv){
     auto run=[&](int ms,float av=.1f,float bv=.2f,uint32_t b_rate=48000,bool mono=false){
         left.read();right.read();left.packets.clear();right.packets.clear();
         auto deadline=std::chrono::steady_clock::now();
+        const auto sample_start=os_gettime_ns();
         for(int i=0;i<ms/10;++i){
-            const auto ts=os_gettime_ns();
+            // Audio timestamps follow sample duration, even if the CI scheduler wakes late.
+            const auto ts=sample_start+static_cast<uint64_t>(i)*10000000ULL;
             output(a,av,ts);output(b,bv,ts,b_rate/100,b_rate,mono);
             left.read();right.read();app.processEvents();
             deadline+=std::chrono::milliseconds(10);std::this_thread::sleep_until(deadline);
