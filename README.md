@@ -33,6 +33,21 @@ The files below are the **0.2.5 pre-release**. The latest stable version is **0.
 | **vban-stream-0.2.5-obs-root.zip** | Merge its **obs-plugins** and **data** folders into the OBS installation folder. Works with **normal and portable OBS**. |
 | **vban-stream-0.2.5-windows-x64.zip** | Copy its **obs-vban-audio** folder into **C:\ProgramData\obs-studio\plugins** for a normal OBS installation. |
 
+### macOS test build
+
+The [0.2.6 Mac pre-release](https://github.com/torment78/vban-stream/releases/tag/v0.2.6-macos.1)
+is for testing on **macOS 13 or later**, with **OBS Studio 31.1.1 or later**.
+The universal `.plugin` bundle contains both Apple Silicon and Intel code.
+
+Use the Mac `.pkg` installer or copy the bundle from the ZIP into
+`~/Library/Application Support/obs-studio/plugins`. Quit OBS before installation.
+These test builds use ad-hoc signing and are not Apple notarized; the
+[Mac installation and testing guide](docs/INSTALL-MAC.txt) explains approval and
+includes a listening checklist. Sustained audio and real OBS GUI testing are still
+required before promoting Mac support to a stable release.
+
+The Windows downloads above remain the existing 0.2.5 build.
+
 ### Using the installer
 
 1. Close OBS, run **vban-stream-0.2.5-windows-x64-setup.exe**, and approve the Windows administrator prompt.

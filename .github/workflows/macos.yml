@@ -31,12 +31,19 @@ jobs:
           "$RUNNER_TEMP/vban-tools/bin/pip" install cmake==4.2.3
           echo "$RUNNER_TEMP/vban-tools/bin" >> "$GITHUB_PATH"
       - name: Cache pinned Mac SDK dependencies
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: sdk-cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .deps
           key: macos-universal-obs31.1.1-20250711-xcode16.4-v1
       - name: Build, run audio tests, and package
         run: bash Build-Mac.sh
+      - name: Save pinned SDK cache
+        if: always() && steps.sdk-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .deps
+          key: macos-universal-obs31.1.1-20250711-xcode16.4-v1
       - name: Upload Mac test package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -60,6 +67,7 @@ jobs:
           name: macos-diagnostics
           path: |
             build_macos/Testing/Temporary/*
+            build_macos/crash-backtrace.log
             build_macos/CMakeFiles/CMakeConfigureLog.yaml
             .deps/obs-studio-*/build_universal/CMakeFiles/CMakeConfigureLog.yaml
           retention-days: 14

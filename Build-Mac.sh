@@ -11,5 +11,8 @@ qt_minimal="$(find "$qt_root" -name libqminimal.dylib -print -quit)"
 export QT_PLUGIN_PATH="$(dirname "$(dirname "$qt_minimal")")"
 export DYLD_FRAMEWORK_PATH="$PWD/.deps/Frameworks:$qt_root/lib"
 export DYLD_LIBRARY_PATH="$PWD/.deps/lib:$PWD/.deps/obs-deps-2025-07-11-universal/lib"
-ctest --preset macos-release --timeout 120
+if ! ctest --preset macos-release --timeout 120; then
+  python3 tools/diagnose-macos.py
+  exit 1
+fi
 python3 tools/package-macos.py
