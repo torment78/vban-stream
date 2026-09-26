@@ -11,8 +11,9 @@ An independent plugin by **ElkaSoft** for OBS Studio.
 Receive named VBAN streams with 1–8 channels each directly in OBS. Send the OBS monitoring mix back to
 two computers, each with its own destination address, UDP port, and stream name.
 
-[**Download the latest stable release**](https://github.com/torment78/vban-stream/releases/latest)
- · [Try the 0.2.5 pre-release](https://github.com/torment78/vban-stream/releases/tag/v0.2.5)
+[**Windows installer — stable 0.2.2**](https://github.com/torment78/vban-stream/releases/download/v0.2.2/obs-vban-audio-0.2.2-windows-x64-setup.exe)
+ · [Windows installer — development 0.2.5](https://github.com/torment78/vban-stream/releases/download/v0.2.5/vban-stream-0.2.5-windows-x64-setup.exe)
+ · [Mac installer — development 0.2.6](https://github.com/torment78/vban-stream/releases/download/v0.2.6-macos.1/vban-stream-0.2.6-macos-universal-test.pkg)
  · [Download all banners](https://github.com/torment78/vban-stream/releases/download/v0.2.5/VBAN-Stream-artwork.zip)
  · [Installation guide](docs/INSTALL-OBS-ROOT.txt)
  · [Report an issue](https://github.com/torment78/vban-stream/issues)
@@ -25,13 +26,17 @@ Free and open source under GPL-2.0-or-later. Donations support development and a
 
 ## Download and install
 
-The files below are the **0.2.5 pre-release**. The latest stable version is **0.2.2** and retains the earlier VBAN Audio name. Tested with **OBS 31.1.1** and **OBS 32.2.1** on Windows x64.
+Windows development builds are **0.2.5**, and the Mac test build is **0.2.6**. The latest stable version is **0.2.2** and retains the earlier VBAN Audio name. Tested with **OBS 31.1.1** and **OBS 32.2.1** on Windows x64.
 
-| Download | Where it goes |
+Use the setup installer for both stable and development builds.
+
+| Installer | Version and platform |
 | --- | --- |
-| **vban-stream-0.2.5-windows-x64-setup.exe** | Dark installer with VBAN Stream artwork for **standard or portable OBS**. Finds installed OBS or lets you browse to its root folder. |
-| **vban-stream-0.2.5-obs-root.zip** | Merge its **obs-plugins** and **data** folders into the OBS installation folder. Works with **normal and portable OBS**. |
-| **vban-stream-0.2.5-windows-x64.zip** | Copy its **obs-vban-audio** folder into **C:\ProgramData\obs-studio\plugins** for a normal OBS installation. |
+| [Windows stable setup](https://github.com/torment78/vban-stream/releases/download/v0.2.2/obs-vban-audio-0.2.2-windows-x64-setup.exe) | 0.2.2, Windows x64, standard or portable OBS |
+| [Windows development setup](https://github.com/torment78/vban-stream/releases/download/v0.2.5/vban-stream-0.2.5-windows-x64-setup.exe) | 0.2.5 pre-release, Windows x64, standard or portable OBS |
+| [Mac development installer](https://github.com/torment78/vban-stream/releases/download/v0.2.6-macos.1/vban-stream-0.2.6-macos-universal-test.pkg) | 0.2.6 pre-release, Apple Silicon and Intel |
+
+Source code and optional manual packages are available separately on GitHub.
 
 ### macOS test build
 
@@ -39,7 +44,7 @@ The [0.2.6 Mac pre-release](https://github.com/torment78/vban-stream/releases/ta
 is for testing on **macOS 13 or later**, with **OBS Studio 31.1.1 or later**.
 The universal `.plugin` bundle contains both Apple Silicon and Intel code.
 
-Use the Mac `.pkg` installer or copy the bundle from the ZIP into
+Use the [Mac setup installer](https://github.com/torment78/vban-stream/releases/download/v0.2.6-macos.1/vban-stream-0.2.6-macos-universal-test.pkg). It installs into
 `~/Library/Application Support/obs-studio/plugins`. Quit OBS before installation.
 These test builds use ad-hoc signing and are not Apple notarized; the
 [Mac installation and testing guide](docs/INSTALL-MAC.txt) explains approval and
@@ -48,7 +53,7 @@ required before promoting Mac support to a stable release.
 
 The Windows downloads above remain the existing 0.2.5 build.
 
-### Using the installer
+### Using the Windows installer
 
 1. Close OBS, run **vban-stream-0.2.5-windows-x64-setup.exe**, and approve the Windows administrator prompt.
 2. Choose **Standard OBS installation** (selected by default) or **Portable OBS**.

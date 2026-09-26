@@ -7,12 +7,14 @@ Requires macOS 13+ and OBS Studio 31.1.1+.
 
 ## Downloads
 
-- `vban-stream-0.2.6-macos-universal-test.pkg`: installs for your current Mac user.
-- `vban-stream-0.2.6-macos-universal-test.zip`: manual installation of the same bundle.
+**[Download the Mac installer](https://github.com/torment78/vban-stream/releases/download/v0.2.6-macos.1/vban-stream-0.2.6-macos-universal-test.pkg)** — installs for your current Mac user.
+
 - `INSTALL-MAC.txt`: setup, targeted macOS approval steps, and tester checklist.
 - `BUILD-INFO.txt`: source commit, architectures and library dependencies.
 - `SHA256SUMS-macos.txt`: checksums of all downloads.
-- `vban-stream-0.2.6-macos-source.zip`: source used by the build.
+
+Source code is available from the [GitHub tag](https://github.com/torment78/vban-stream/tree/v0.2.6-macos.1).
+Manual installation files are secondary assets on the GitHub release.
 
 The plugin uses an ad-hoc signature. The package is not Developer ID signed or
 Apple notarized; macOS may require manual approval. Use the ZIP and the instructions

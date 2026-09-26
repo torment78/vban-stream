@@ -121,13 +121,12 @@ def main():
         elif file.is_file() and (not target.is_file() or digest(file) != digest(target)):
             raise RuntimeError("Installer payload mismatch: " + str(file))
     run("codesign", "--verify", "--strict", installed)
-    source_archive = destination / ("vban-stream-" + VERSION + "-macos-source.zip")
-    run("git", "-C", ROOT, "archive", "--format=zip", "--prefix=vban-stream/", "-o", source_archive, "HEAD")
+    # Source remains available from the matching GitHub tag; do not duplicate it as a release asset.
     shutil.copy2(payload / "INSTALL-MAC.txt", destination / "INSTALL-MAC.txt")
     shutil.copy2(payload / "BUILD-INFO.txt", destination / "BUILD-INFO.txt")
-    files = [archive, installer, source_archive, destination / "INSTALL-MAC.txt", destination / "BUILD-INFO.txt"]
+    files = [archive, installer, destination / "INSTALL-MAC.txt", destination / "BUILD-INFO.txt"]
     (destination / "SHA256SUMS-macos.txt").write_text("".join(digest(p) + "  " + p.name + "\n" for p in files))
-    print("Universal Mac ZIP, per-user installer payload, signature, and source archive verified:", destination)
+    print("Universal Mac installer, manual ZIP, payload, and signature verified:", destination)
 
 if __name__ == "__main__":
     main()

@@ -48,7 +48,13 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: vban-stream-macos-test
-          path: dist/macos/*
+          # Explicit files keep stale source archives out of user downloads.
+          path: |
+            dist/macos/*-universal-test.pkg
+            dist/macos/*-universal-test.zip
+            dist/macos/INSTALL-MAC.txt
+            dist/macos/BUILD-INFO.txt
+            dist/macos/SHA256SUMS-macos.txt
           if-no-files-found: error
           retention-days: 30
       - name: Prepare native validation runtime

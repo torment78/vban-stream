@@ -17,9 +17,8 @@ Built with Visual Studio 2026. All 12 core/OBS tests passed on OBS 31.1.1, follo
 
 ## Downloads
 
-- **vban-stream-0.2.5-windows-x64-setup.exe** — recommended; dark installer for standard or portable OBS.
-- **vban-stream-0.2.5-obs-root.zip** — merge the obs-plugins and data folders into the selected OBS root; supports installed and portable OBS.
-- **vban-stream-0.2.5-windows-x64.zip** — ProgramData plugin layout for standard OBS.
+- **[Download the Windows setup installer](https://github.com/torment78/vban-stream/releases/download/v0.2.5/vban-stream-0.2.5-windows-x64-setup.exe)** — recommended; dark installer for standard or portable OBS.
+- Optional manual-install ZIPs and source code are available separately through GitHub.
 - **VBAN-INSTALL.txt** — installation and usage guide.
 - **VBAN-Stream-artwork.zip** — all eight PNG banners and matching JPEGs under 1 MB each.
 - **social-preview.jpg** — horizontal social preview image.
