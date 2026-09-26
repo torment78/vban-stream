@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-#include <winsock2.h>
-#include <ws2tcpip.h>
+#include "socket-platform.hpp"
+#ifdef _WIN32
 #include <iphlpapi.h>
-#include <mstcpip.h>
-#include <mswsock.h>
+#else
+#include <ifaddrs.h>
+#include <net/if.h>
+#endif
 #include "vban-transmitter.hpp"
 #include <algorithm>
 #include <cmath>
@@ -46,6 +48,7 @@ size_t encode_stereo_pcm(uint8_t *out, uint32_t rate, const std::string &name,
 }
 std::vector<LocalIPv4> local_ipv4_addresses(std::string &error) {
     std::vector<LocalIPv4> result;
+    #ifdef _WIN32
     ULONG size = 15000;
     std::vector<uint8_t> buffer(size);
     ULONG rc = ERROR_BUFFER_OVERFLOW;
@@ -74,27 +77,43 @@ std::vector<LocalIPv4> local_ipv4_addresses(std::string &error) {
                 entry->DadState != IpDadStatePreferred) continue;
             const auto *address = reinterpret_cast<const sockaddr_in *>(entry->Address.lpSockaddr);
             char ip[INET_ADDRSTRLEN]{};
-            if (InetNtopA(AF_INET, &address->sin_addr, ip, sizeof(ip)))
+            if (vban::net::format(AF_INET, &address->sin_addr, ip, sizeof(ip)))
                 result.push_back({ip, label, adapter->IfIndex});
         }
     }
+    #else
+    ifaddrs *addresses = nullptr;
+    if (getifaddrs(&addresses) != 0) {
+        error = "Cannot enumerate local IPv4 adapters (Socket " + std::to_string(net::error()) + ").";
+        return result;
+    }
+    struct AddressList { ifaddrs *value; ~AddressList() { freeifaddrs(value); } } owner{addresses};
+    for (auto *entry=addresses; entry; entry=entry->ifa_next) {
+        if (!entry->ifa_addr || entry->ifa_addr->sa_family != AF_INET || !(entry->ifa_flags & IFF_UP)) continue;
+        const auto index=if_nametoindex(entry->ifa_name);
+        if (!index) continue;
+        const auto *address=reinterpret_cast<const sockaddr_in *>(entry->ifa_addr);
+        char ip[INET_ADDRSTRLEN]{};
+        if (net::format(AF_INET,&address->sin_addr,ip,sizeof(ip)))
+            result.push_back({ip,entry->ifa_name,index});
+    }
+    #endif
     error.clear();
     return result;
 }
 struct Transmitter::Routing {
     struct Destination {
-        SOCKET socket = INVALID_SOCKET;
+        vban::net::Socket socket = vban::net::invalid;
         sockaddr_in address{}, local{};
         ReturnConfig config;
-        ~Destination() { if (socket != INVALID_SOCKET) closesocket(socket); }
+        ~Destination() { if (socket != vban::net::invalid) vban::net::close(socket); }
     };
     std::array<Destination, return_count> destinations;
 };
 Transmitter::Transmitter() {
-    WSADATA wsa{};
-    if (WSAStartup(MAKEWORD(2,2), &wsa)) throw std::runtime_error("Return Winsock initialization failed.");
+    if (vban::net::startup()) throw std::runtime_error("Return Socket initialization failed.");
 }
-Transmitter::~Transmitter() { routing_.reset(); WSACleanup(); }
+Transmitter::~Transmitter() { routing_.reset(); vban::net::cleanup(); }
 Transmitter::Prepared Transmitter::prepare(const ReturnConfigs &cfg, std::string &error, const std::string &local_ip) {
     LocalIPv4 selected;
     if (!local_ip.empty() && std::any_of(cfg.begin(), cfg.end(), [](const auto &r) { return r.enabled; })) {
@@ -118,7 +137,7 @@ Transmitter::Prepared Transmitter::prepare(const ReturnConfigs &cfg, std::string
         if (!d.config.enabled) continue;
         d.address.sin_family = AF_INET;
         d.address.sin_port = htons(d.config.destination_port);
-        if (InetPtonA(AF_INET, d.config.destination_ip.c_str(), &d.address.sin_addr) != 1 ||
+        if (vban::net::parse(AF_INET, d.config.destination_ip.c_str(), &d.address.sin_addr) != 1 ||
             d.address.sin_addr.s_addr == INADDR_ANY) {
             error = prefix + "Enter a valid destination IPv4 address."; return {};
         }
@@ -127,38 +146,35 @@ Transmitter::Prepared Transmitter::prepare(const ReturnConfigs &cfg, std::string
             error = prefix + "Stream name must contain 1 to 16 printable ASCII characters."; return {};
         }
         d.socket = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        u_long mode = 1;
-        BOOL broadcast = TRUE;
-        if (d.socket == INVALID_SOCKET || ioctlsocket(d.socket, FIONBIO, &mode) == SOCKET_ERROR ||
+        int broadcast = 1;
+        if (d.socket == vban::net::invalid || !net::nonblocking(d.socket) ||
             setsockopt(d.socket, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char *>(&broadcast),
-                       sizeof(broadcast)) == SOCKET_ERROR) {
-            error = prefix + "Cannot create return socket (Winsock " + std::to_string(WSAGetLastError()) + ").";
+                       sizeof(broadcast)) == vban::net::failure) {
+            error = prefix + "Cannot create return socket (Socket " + std::to_string(vban::net::error()) + ").";
             return {};
         }
         if (!local_ip.empty()) {
             sockaddr_in local{}; local.sin_family = AF_INET; // Port zero keeps TX independent of RX.
-            const DWORD index = htonl(selected.interface_index);
-            if (InetPtonA(AF_INET, local_ip.c_str(), &local.sin_addr) != 1 ||
-                setsockopt(d.socket, IPPROTO_IP, IP_UNICAST_IF, reinterpret_cast<const char *>(&index), sizeof(index)) ||
+            if (vban::net::parse(AF_INET, local_ip.c_str(), &local.sin_addr) != 1 ||
+                !net::select_interface(d.socket, selected.interface_index) ||
                 bind(d.socket, reinterpret_cast<const sockaddr *>(&local), sizeof(local))) {
-                error = prefix + "Cannot use local sender " + local_ip + " (Winsock " + std::to_string(WSAGetLastError()) + ").";
+                error = prefix + "Cannot use local sender " + local_ip + " (Socket " + std::to_string(vban::net::error()) + ").";
                 return {};
             }
         }
         // UDP connect selects a route/local endpoint; it performs no handshake and sends no audio.
         if (connect(d.socket, reinterpret_cast<const sockaddr *>(&d.address), sizeof(d.address))) {
-            error = prefix + "Cannot select destination route (Winsock " + std::to_string(WSAGetLastError()) + ").";
+            error = prefix + "Cannot select destination route (Socket " + std::to_string(vban::net::error()) + ").";
             return {};
         }
-        int local_size = sizeof(d.local);
+        vban::net::Length local_size = sizeof(d.local);
         if (getsockname(d.socket, reinterpret_cast<sockaddr *>(&d.local), &local_size)) {
-            error = prefix + "Cannot inspect the sender socket (Winsock " + std::to_string(WSAGetLastError()) + ").";
+            error = prefix + "Cannot inspect the sender socket (Socket " + std::to_string(vban::net::error()) + ").";
             return {};
         }
         // A receiver can be offline without ICMP port-unreachable poisoning later sends.
-        BOOL reset = FALSE; DWORD returned = 0;
-        if (WSAIoctl(d.socket, SIO_UDP_CONNRESET, &reset, sizeof(reset), nullptr, 0, &returned, nullptr, nullptr)) {
-            error = prefix + "Cannot configure UDP socket error handling (Winsock " + std::to_string(WSAGetLastError()) + ").";
+        if (!net::ignore_port_unreachable(d.socket)) {
+            error = prefix + "Cannot configure UDP socket error handling (Socket " + std::to_string(vban::net::error()) + ").";
             return {};
         }
     }
@@ -174,7 +190,7 @@ void Transmitter::activate(Prepared next) {
             const auto &d = routing_->destinations[i];
             auto &s = status_[i]; s.state = ReturnState::ready;
             char ip[INET_ADDRSTRLEN]{};
-            InetNtopA(AF_INET, &d.local.sin_addr, ip, sizeof(ip));
+            vban::net::format(AF_INET, &d.local.sin_addr, ip, sizeof(ip));
             s.source_ip = ip; s.source_port = ntohs(d.local.sin_port);
             s.destination_ip = d.config.destination_ip; s.destination_port = d.config.destination_port;
             s.stream_name = d.config.stream_name;
@@ -219,7 +235,7 @@ void Transmitter::send(const float *stereo, size_t frames, uint32_t rate) {
                                  reinterpret_cast<const sockaddr *>(&d.address), sizeof(d.address));
         if (sent != static_cast<int>(size)) {
             ++state.errors; state.state = ReturnState::error;
-            state.detail = "UDP send failed (Winsock " + std::to_string(WSAGetLastError()) + ").";
+            state.detail = "UDP send failed (Socket " + std::to_string(vban::net::error()) + ").";
         } else {
             const auto now = std::chrono::steady_clock::now();
             if (last_send_[i].time_since_epoch().count()) {

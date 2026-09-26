@@ -33,12 +33,12 @@
   },
   "platformConfig": {
     "macos": {
-      "bundleId": "local.obs-vban-audio"
+      "bundleId": "xyz.elkasoft.vbanstream"
     }
   },
   "name": "obs-vban-audio",
   "displayName": "VBAN Stream",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "author": "VBAN Stream contributors",
   "website": "https://github.com/torment78/vban-stream",
   "email": ""

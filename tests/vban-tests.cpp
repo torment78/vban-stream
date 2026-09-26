@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-#include <winsock2.h>
-#include <ws2tcpip.h>
+#include "socket-platform.hpp"
 #include "receiver.hpp"
 #include <algorithm>
 #include <chrono>
@@ -218,23 +217,23 @@ static void clock_drift_tests() {
 
 class Sender {
 public:
-    SOCKET socket = INVALID_SOCKET;
+    vban::net::Socket socket = vban::net::invalid;
     Sender() {
         socket=::socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
-        if(socket==INVALID_SOCKET) throw std::runtime_error("Sender socket");
+        if(socket==vban::net::invalid) throw std::runtime_error("Sender socket");
     }
-    ~Sender(){closesocket(socket);}
+    ~Sender(){vban::net::close(socket);}
     void send(uint16_t port,const std::vector<uint8_t> &bytes) {
         sockaddr_in dest{};dest.sin_family=AF_INET;dest.sin_port=htons(port);
-        InetPtonA(AF_INET,"127.0.0.1",&dest.sin_addr);
+        vban::net::parse(AF_INET,"127.0.0.1",&dest.sin_addr);
         if(sendto(socket,reinterpret_cast<const char*>(bytes.data()),static_cast<int>(bytes.size()),0,
-            reinterpret_cast<sockaddr*>(&dest),sizeof(dest))==SOCKET_ERROR) throw std::runtime_error("sendto failed");
+            reinterpret_cast<sockaddr*>(&dest),sizeof(dest))==vban::net::failure) throw std::runtime_error("sendto failed");
     }
 };
 static uint16_t free_port() {
     Sender s;sockaddr_in a{};a.sin_family=AF_INET;a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
     check(bind(s.socket,reinterpret_cast<sockaddr*>(&a),sizeof(a))==0,"Reserve test port");
-    int size=sizeof(a);getsockname(s.socket,reinterpret_cast<sockaddr*>(&a),&size);
+    vban::net::Length size=sizeof(a);getsockname(s.socket,reinterpret_cast<sockaddr*>(&a),&size);
     return ntohs(a.sin_port);
 }
 static void network_tests() {

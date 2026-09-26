@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Real DLL -> UDP receiver -> jitter buffer -> OBS planar audio, with distinct lanes.
-#include <winsock2.h>
-#include <ws2tcpip.h>
+#include "socket-platform.hpp"
 #include <obs.h>
 #include <obs-audio-controls.h>
 #include <QApplication>
@@ -77,17 +76,16 @@ int main(int argc, char **argv) {
         QWidget window;
         auto *frontend = new TestFrontend(window);
         obs_frontend_set_callbacks_internal(frontend);
-        WSADATA wsa{};
-        check(WSAStartup(MAKEWORD(2, 2), &wsa) == 0, "Winsock startup");
-        SOCKET sender = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        SOCKET reservation = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        check(sender != INVALID_SOCKET && reservation != INVALID_SOCKET, "Create sockets");
+        check(vban::net::startup() == 0, "Socket startup");
+        vban::net::Socket sender = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        vban::net::Socket reservation = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        check(sender != vban::net::invalid && reservation != vban::net::invalid, "Create sockets");
         sockaddr_in destination{};
         destination.sin_family = AF_INET; destination.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
         check(bind(reservation, reinterpret_cast<sockaddr *>(&destination), sizeof(destination)) == 0, "Reserve receiver port");
-        int size = sizeof(destination);
+        vban::net::Length size = sizeof(destination);
         check(getsockname(reservation, reinterpret_cast<sockaddr *>(&destination), &size) == 0, "Read receiver port");
-        closesocket(reservation);
+        vban::net::close(reservation);
         const QString root = QString::fromLocal8Bit(argv[3]);
         check(QDir().mkpath(root + "/obs-vban-audio"), "Create isolated settings folder");
         QFile file(root + "/obs-vban-audio/settings.json");
@@ -156,7 +154,7 @@ int main(int argc, char **argv) {
         obs_source_remove_audio_capture_callback(source, capture, &state);
         obs_source_dec_active(source); obs_source_release(source);
         obs_shutdown(); app.processEvents(); obs_frontend_set_callbacks_internal(nullptr);
-        closesocket(sender); WSACleanup();
+        vban::net::close(sender); vban::net::cleanup();
         std::cout << "OBS multichannel passed: " << channels << " incoming channels, PCM16/24, distinct signed lanes, "
             << state.matching << " matching blocks, automatic live channel change, input indicators, native meter lanes, stream timeout"
             << (channels == 7 ? ", silent eighth lane" : "") << ".\n";

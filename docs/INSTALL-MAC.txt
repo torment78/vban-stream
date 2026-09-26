@@ -1,0 +1,81 @@
+VBAN STREAM 0.2.6 - MAC TEST BUILD
+by ElkaSoft
+
+REQUIREMENTS
+macOS 13 or later, Apple Silicon or Intel, OBS Studio 31.1.1 or later.
+The same universal plugin contains both arm64 and x86_64 code.
+This is a test release. A real OBS session and sustained LAN audio test are required.
+
+INSTALL WITH THE PKG
+1. Quit OBS Studio.
+2. Open vban-stream-0.2.6-macos-universal-test.pkg and follow the installer.
+3. Install for your current user. The plugin goes here:
+   ~/Library/Application Support/obs-studio/plugins/obs-vban-audio.plugin
+4. Restart OBS. Open Tools > VBAN Stream.
+
+MANUAL ZIP INSTALL
+1. Quit OBS and extract the ZIP.
+2. In Finder, choose Go > Go to Folder and enter:
+   ~/Library/Application Support/obs-studio/plugins
+3. Create the plugins folder if needed. Copy obs-vban-audio.plugin into it.
+   Keep the whole .plugin bundle intact. Replace an earlier test copy if present.
+4. Restart OBS.
+
+MACOS APPROVAL FOR THIS TEST BUILD
+The plugin has an ad-hoc signature. The installer is not Developer ID signed or
+Apple notarized, so macOS may block it. If Installer is blocked, use the ZIP.
+After copying the plugin from this project's release, you can approve only this
+bundle and refresh its local signature in Terminal:
+
+xattr -r -d com.apple.quarantine "$HOME/Library/Application Support/obs-studio/plugins/obs-vban-audio.plugin"
+codesign --force --sign - --timestamp=none "$HOME/Library/Application Support/obs-studio/plugins/obs-vban-audio.plugin"
+
+The first command can report that no quarantine attribute exists; that simply
+means it was not quarantined. Restart OBS after signing. Do not disable Gatekeeper
+or change security settings for the entire computer.
+
+RECEIVE AUDIO
+Open Tools > VBAN Stream. Set the sender's IPv4 address, UDP port, and the exact
+case-sensitive VBAN stream name. Enable an input and give it a friendly label.
+Apply the settings. Add a VBAN Stream source in OBS and choose that input.
+Each of the eight inputs can receive one stream containing one to eight channels.
+The live indicators show incoming channel count and PCM format.
+OBS can convert incoming surround layouts to its global audio layout. For exact
+numbered channel positions with OBS at 7.1, send eight channels and leave unused
+channels silent. Smaller layouts use OBS's normal surround conversion.
+
+SEND MONITOR RETURNS
+Open Tools > VBAN Stream. Select the Mac's local sender address from the network
+dropdown (for example en0 plus its IPv4 address), or leave automatic routing.
+Enable return 1 and/or return 2. Set the receiver's destination IPv4 address,
+UDP port, stream name, and PCM16 or PCM24. Set matching values on the receiver.
+In OBS Advanced Audio Properties, choose Monitor Only or Monitor and Output for
+the sources you want included. Both returns carry the same stereo monitor mix.
+Start at 48 kHz with the default 60 ms return buffer. Increase the buffer if needed.
+Allow OBS network access if macOS asks. A Sending status means UDP datagrams were
+submitted; verify actual reception on the receiving machine as well.
+
+TEST CHECKLIST
+- Record Mac model/chip, macOS version, OBS version, and wired/Wi-Fi connection.
+- Confirm the plugin appears in Tools and in Add Source, and settings survive restart.
+- Test receiving mono, stereo, and eight channels with PCM16 and PCM24.
+- Confirm the source picker stays open while status indicators update.
+- Test both returns separately, then together, in PCM16 and PCM24.
+- Check source volume, mute, monitoring modes, and audio/video sync adjustments.
+- Confirm the selected source IP matches packets arriving on the receiver.
+- Listen/record for at least 20 minutes. Note any ticks, gaps, drift or distortion.
+- Stop/restart a sender, disable/re-enable a return, and restart OBS.
+- Try resizing the settings window and confirm all buttons remain accessible.
+If anything fails, include Help > Log Files > View Current Log, the exact settings,
+and whether the issue was incoming audio or a monitor return. Remove private
+information before sharing logs.
+
+UNINSTALL
+Quit OBS and remove only:
+~/Library/Application Support/obs-studio/plugins/obs-vban-audio.plugin
+Saved settings remain in the OBS plugin_config folder for future reinstallations.
+
+Website: https://elkasoft.xyz/
+Support: https://discord.gg/AAhxYKzmkz
+Source: https://github.com/torment78/vban-stream
+Donate: https://ko-fi.com/msffixit

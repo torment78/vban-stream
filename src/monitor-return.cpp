@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-#include <windows.h>
-#include <avrt.h>
+#include "worker-platform.hpp"
 #include "monitor-return.hpp"
 #include "return-audio.hpp"
 #include <obs.h>
@@ -175,22 +174,13 @@ struct MonitorReturn::Impl {
     std::atomic<bool> stopping{false};
     bool started = false;
     std::atomic<uint32_t> buffer_ms{default_return_buffer_ms};
-    std::atomic<bool> mmcss{false};
+    std::atomic<bool> priority_active{false};
     const bool ignore_program_mute = obs_get_version() >= ((32u << 24) | (2u << 16));
-    HANDLE stop_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-    HANDLE timer = CreateWaitableTimerExW(nullptr, nullptr, 0x00000002, TIMER_ALL_ACCESS);
+    WorkerWait timer;
     std::thread worker;
     std::mutex registry_mutex;
     std::unordered_map<obs_source_t *, std::shared_ptr<Tap>> taps;
-    Impl() {
-        if (!timer) timer = CreateWaitableTimerW(nullptr, FALSE, nullptr);
-        if (!stop_event || !timer) {
-            if (stop_event) CloseHandle(stop_event);
-            if (timer) CloseHandle(timer);
-            throw std::runtime_error("Cannot create monitor return worker timer.");
-        }
-    }
-    ~Impl() { shutdown(); CloseHandle(timer); CloseHandle(stop_event); }
+    ~Impl() { shutdown(); }
     void track(obs_source_t *source) {
         if (stopping || obs_source_get_type(source) != OBS_SOURCE_TYPE_INPUT ||
             !(obs_source_get_output_flags(source) & OBS_SOURCE_AUDIO)) return;
@@ -227,13 +217,8 @@ struct MonitorReturn::Impl {
         });
     }
     void run() {
-        // MMCSS prioritizes just this audio worker; no system-wide timer/priority changes.
-        struct Scheduling {
-            DWORD index = 0;
-            HANDLE handle = AvSetMmThreadCharacteristicsW(L"Pro Audio", &index);
-            ~Scheduling() { if (handle) AvRevertMmThreadCharacteristics(handle); }
-        } scheduling;
-        mmcss = scheduling.handle != nullptr;
+        WorkerPriority scheduling;
+        priority_active = scheduling.active();
         std::vector<std::shared_ptr<Tap>> live;
         uint32_t rate = 0;
         int64_t cursor = 0, previous_latency_ns = 0;
@@ -274,21 +259,15 @@ struct MonitorReturn::Impl {
                 if (enabled) tx.send(mix.data(), return_frames, rate);
                 cursor += return_frames;
             }
-            LARGE_INTEGER due{};
             const auto remaining = std::max<int64_t>(100000, (cursor + static_cast<int64_t>(return_frames) - target) * 1000000000LL / rate);
-            due.QuadPart = -(remaining / 100);
-            if (!SetWaitableTimer(timer, &due, 0, nullptr, nullptr, FALSE))
-                throw std::runtime_error("Monitor return scheduling timer failed (Windows " + std::to_string(GetLastError()) + ").");
-            const HANDLE handles[]{stop_event, timer};
-            if (WaitForMultipleObjects(2, handles, FALSE, INFINITE) == WAIT_FAILED)
-                throw std::runtime_error("Monitor return worker wait failed (Windows " + std::to_string(GetLastError()) + ").");
+            timer.wait(remaining);
         }
     }
     void shutdown() {
         if (!started) return;
         stopping = true;
         signal_handler_disconnect(obs_get_signal_handler(), "source_create", created, this);
-        SetEvent(stop_event);
+        timer.stop();
         if (worker.joinable()) worker.join();
         for (auto &entry : taps) entry.second->detach();
         // A failed weak upgrade can mean destruction has started but not yet emitted destroy.
@@ -317,7 +296,7 @@ void MonitorReturn::activate(Transmitter::Prepared cfg, uint32_t buffer_ms) {
 ReturnStatus MonitorReturn::status(size_t i) const {
     auto result = impl_->tx.status(i);
     result.buffer_ms = impl_->buffer_ms.load();
-    result.audio_priority = impl_->mmcss.load();
+    result.audio_priority = impl_->priority_active.load();
     result.capture_queue_capacity = capture_blocks;
     std::lock_guard lock(impl_->registry_mutex);
     for (const auto &entry : impl_->taps) {

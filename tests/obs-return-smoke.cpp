@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-#include <winsock2.h>
-#include <ws2tcpip.h>
+#include "socket-platform.hpp"
+#ifdef __APPLE__
+static constexpr auto test_second_ip = "127.0.0.1";
+#else
+static constexpr auto test_second_ip = "127.0.0.2";
+#endif
 #include "vban-protocol.hpp"
 #include <obs.h>
 #include <obs-module.h>
@@ -31,26 +35,26 @@
 #include "frontend-stub.hpp"
 static void check(bool ok,const char *message){if(!ok)throw std::runtime_error(message);}
 struct Sink {
-    SOCKET socket = INVALID_SOCKET;
+    vban::net::Socket socket = vban::net::invalid;
     uint16_t port=0;
     std::string last_peer;
     std::vector<vban::Packet> packets;
     explicit Sink(const char *ip) {
         socket=::socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
-        sockaddr_in address{};address.sin_family=AF_INET;InetPtonA(AF_INET,ip,&address.sin_addr);
+        sockaddr_in address{};address.sin_family=AF_INET;vban::net::parse(AF_INET,ip,&address.sin_addr);
         check(bind(socket,reinterpret_cast<sockaddr*>(&address),sizeof(address))==0,"Bind test sink");
-        int n=sizeof(address);getsockname(socket,reinterpret_cast<sockaddr*>(&address),&n);port=ntohs(address.sin_port);
-        u_long mode=1;ioctlsocket(socket,FIONBIO,&mode);
+        vban::net::Length n=sizeof(address);getsockname(socket,reinterpret_cast<sockaddr*>(&address),&n);port=ntohs(address.sin_port);
+        check(vban::net::nonblocking(socket),"Nonblocking test socket");
     }
-    ~Sink(){closesocket(socket);}
+    ~Sink(){vban::net::close(socket);}
     void read(){
         std::array<uint8_t,vban::max_datagram> bytes{};
         for(;;){
-            sockaddr_in peer{};int peer_size=sizeof(peer);
-            const int got=recvfrom(socket,reinterpret_cast<char*>(bytes.data()),static_cast<int>(bytes.size()),0,
+            sockaddr_in peer{};vban::net::Length peer_size=sizeof(peer);
+            const auto got=recvfrom(socket,reinterpret_cast<char*>(bytes.data()),static_cast<int>(bytes.size()),0,
                 reinterpret_cast<sockaddr*>(&peer),&peer_size);
             if(got<0)break;
-            char ip[INET_ADDRSTRLEN]{};InetNtopA(AF_INET,&peer.sin_addr,ip,sizeof(ip));last_peer=ip;
+            char ip[INET_ADDRSTRLEN]{};vban::net::format(AF_INET,&peer.sin_addr,ip,sizeof(ip));last_peer=ip;
             vban::Packet packet;
             check(vban::decode(bytes.data(),got,packet)==vban::ParseError::none,"Actual return is valid VBAN");
             check(packet.format.rate==48000 && packet.format.channels==2 && (packet.format.type==1 || packet.format.type==2),"Stereo PCM16/24 at unchanged 48 kHz");
@@ -83,8 +87,8 @@ int main(int argc,char **argv){
     check(argc==4,"Expected DLL, data and isolated config paths");
     qputenv("QT_QPA_PLATFORM","minimal:enable_fonts");
     QApplication app(argc,argv);
-    WSADATA wsa{};check(WSAStartup(MAKEWORD(2,2),&wsa)==0,"Winsock");
-    Sink left("127.0.0.1"),right("127.0.0.2");
+    check(vban::net::startup()==0,"Socket");
+    Sink left("127.0.0.1"),right(test_second_ip);
     QWidget window;
     auto *frontend=new TestFrontend(window);obs_frontend_set_callbacks_internal(frontend);
     const QString root=QString::fromLocal8Bit(argv[3]);
@@ -125,7 +129,7 @@ int main(int argc,char **argv){
         auto *port=dialog->findChild<QSpinBox*>(prefix+"port");
         auto *name=dialog->findChild<QLineEdit*>(prefix+"name");
         check(enabled && ip && port && name,"Exactly destination controls exist");
-        enabled->setChecked(enable);ip->setText(i?"127.0.0.2":"127.0.0.1");
+        enabled->setChecked(enable);ip->setText(i?test_second_ip:"127.0.0.1");
         port->setValue(i?right.port:left.port);name->setText(i?"MONITOR-B":"MONITOR-A");
     };
     check(!dialog->findChild<QCheckBox*>("return_0_enabled")->isChecked() &&

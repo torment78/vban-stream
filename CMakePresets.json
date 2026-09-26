@@ -1,14 +1,14 @@
 {
   "version": 8,
   "cmakeMinimumRequired": {
-    "major": 4,
-    "minor": 3,
+    "major": 3,
+    "minor": 28,
     "patch": 0
   },
   "configurePresets": [
     {
       "name": "windows-x64",
-      "displayName": "Windows x64 — Visual Studio 2026",
+      "displayName": "Windows x64 \u2014 Visual Studio 2026",
       "description": "MSVC v145, Windows SDK 10.0.26100.0, native OBS VBAN plugin",
       "binaryDir": "${sourceDir}/build_x64",
       "generator": "Visual Studio 18 2026",
@@ -25,6 +25,25 @@
         "lhs": "${hostSystemName}",
         "rhs": "Windows"
       }
+    },
+    {
+      "name": "macos-universal",
+      "displayName": "macOS - Apple Silicon and Intel",
+      "binaryDir": "${sourceDir}/build_macos",
+      "generator": "Xcode",
+      "cacheVariables": {
+        "CMAKE_OSX_ARCHITECTURES": "arm64;x86_64",
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "13.0",
+        "ENABLE_FRONTEND_API": true,
+        "ENABLE_QT": true,
+        "BUILD_TESTING": true,
+        "CMAKE_COMPILE_WARNING_AS_ERROR": false
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
     }
   ],
   "buildPresets": [
@@ -32,6 +51,11 @@
       "name": "windows-x64",
       "configurePreset": "windows-x64",
       "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "macos-release",
+      "configurePreset": "macos-universal",
+      "configuration": "Release"
     }
   ],
   "testPresets": [
@@ -39,6 +63,14 @@
       "name": "windows-x64",
       "configurePreset": "windows-x64",
       "configuration": "RelWithDebInfo",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "macos-release",
+      "configurePreset": "macos-universal",
+      "configuration": "Release",
       "output": {
         "outputOnFailure": true
       }

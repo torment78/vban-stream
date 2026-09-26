@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-#include <winsock2.h>
-#include <ws2tcpip.h>
+#include "socket-platform.hpp"
+#ifdef __APPLE__
+static constexpr auto test_second_ip = "127.0.0.1";
+#else
+static constexpr auto test_second_ip = "127.0.0.2";
+#endif
 #include "vban-transmitter.hpp"
 #include "return-audio.hpp"
 #include <chrono>
@@ -164,16 +168,16 @@ int main() {
     for(size_t i=0;i<75;++i){check(stall_queue->write_slot(),"Capture reserve handles 200 ms stall");stall_queue->publish();}
     check(stall_queue->size()==75,"Queue occupancy telemetry");
     Transmitter tx;
-    SOCKET sockets[2]{INVALID_SOCKET,INVALID_SOCKET};
+    vban::net::Socket sockets[2]{vban::net::invalid,vban::net::invalid};
     ReturnConfigs cfg=default_returns();
     for(size_t i=0;i<2;++i){
         sockets[i]=socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
         sockaddr_in address{};address.sin_family=AF_INET;
-        InetPtonA(AF_INET,i?"127.0.0.2":"127.0.0.1",&address.sin_addr);
+        vban::net::parse(AF_INET,i?test_second_ip:"127.0.0.1",&address.sin_addr);
         check(bind(sockets[i],reinterpret_cast<sockaddr*>(&address),sizeof(address))==0,"Bind return destinations");
-        int size=sizeof(address);getsockname(sockets[i],reinterpret_cast<sockaddr*>(&address),&size);
-        DWORD timeout=500;setsockopt(sockets[i],SOL_SOCKET,SO_RCVTIMEO,reinterpret_cast<char*>(&timeout),sizeof(timeout));
-        cfg[i]={true,i?"127.0.0.2":"127.0.0.1",ntohs(address.sin_port),i?"SECOND":"FIRST"};
+        vban::net::Length size=sizeof(address);getsockname(sockets[i],reinterpret_cast<sockaddr*>(&address),&size);
+        check(vban::net::receive_timeout(sockets[i],500),"Receiver timeout");
+        cfg[i]={true,i?test_second_ip:"127.0.0.1",ntohs(address.sin_port),i?"SECOND":"FIRST"};
     }
     std::string error;
     auto ready=tx.prepare(cfg,error);check(bool(ready),"Prepare two independent destinations");tx.activate(ready);
@@ -181,8 +185,8 @@ int main() {
     std::array<uint8_t,max_datagram> first{},second{};
     sockaddr_in peers[2]{};
     auto receive=[&](size_t i,auto &buffer){
-        int size=sizeof(peers[i]);
-        const int got=recvfrom(sockets[i],reinterpret_cast<char*>(buffer.data()),static_cast<int>(buffer.size()),0,
+        vban::net::Length size=sizeof(peers[i]);
+        const auto got=recvfrom(sockets[i],reinterpret_cast<char*>(buffer.data()),static_cast<int>(buffer.size()),0,
             reinterpret_cast<sockaddr*>(&peers[i]),&size);
         check(got>0,"Receive actual UDP return");return got;
     };
@@ -192,7 +196,7 @@ int main() {
     const auto n1=receive(0,first),n2=receive(1,second);
     for(size_t i=0;i<2;++i){
         const auto s=tx.status(i);char ip[INET_ADDRSTRLEN]{};
-        InetNtopA(AF_INET,&peers[i].sin_addr,ip,sizeof(ip));
+        vban::net::format(AF_INET,&peers[i].sin_addr,ip,sizeof(ip));
         check(s.source_ip==ip && s.source_port==ntohs(peers[i].sin_port) &&
               s.destination_ip==cfg[i].destination_ip && s.destination_port==cfg[i].destination_port,
               "Reported automatic source and destination match actual packets");
@@ -236,7 +240,7 @@ int main() {
     ready=tx.prepare(valid,error,"127.0.0.1");check(bool(ready),"Select an explicit active IPv4 adapter");tx.activate(ready);
     tx.send(samples.data(),128,48000);receive(0,first);receive(1,second);
     for(size_t i=0;i<2;++i){
-        char ip[INET_ADDRSTRLEN]{};InetNtopA(AF_INET,&peers[i].sin_addr,ip,sizeof(ip));
+        char ip[INET_ADDRSTRLEN]{};vban::net::format(AF_INET,&peers[i].sin_addr,ip,sizeof(ip));
         check(std::string(ip)=="127.0.0.1" && tx.status(i).source_ip==ip,"Both destinations use the selected sender IPv4");
     }
     check(!tx.prepare(valid,error,"192.0.2.123"),"Unavailable address cannot silently fall back");
@@ -249,7 +253,7 @@ int main() {
     tx.send(samples.data(),128,48000);receive(0,first);receive(1,second);
     check(tx.status(0).state==ReturnState::sending && tx.status(0).send_gaps>=1 &&
           tx.status(0).max_send_gap_ms>=1000,"Report sender scheduling gaps and recover live status");
-    for(auto s:sockets)closesocket(s);
+    for(auto s:sockets)vban::net::close(s);
     std::cout<<"Return core passed: PCM16/24 protocol, rollover, concurrent ring, timeline alignment, two actual UDP destinations, independent counters and invalid settings.\n";
     return 0;
  } catch(const std::exception &e) { std::cerr<<"Return test failed: "<<e.what()<<"\n";return 1; }

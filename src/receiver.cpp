@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-#include <winsock2.h>
-#include <ws2tcpip.h>
+#include "socket-platform.hpp"
 #include "receiver.hpp"
 #include <algorithm>
 #include <chrono>
@@ -9,13 +8,13 @@
 
 namespace vban {
 struct Receiver::Socket {
-    SOCKET handle = INVALID_SOCKET;
-    ~Socket() { if (handle != INVALID_SOCKET) closesocket(handle); }
+    vban::net::Socket handle = vban::net::invalid;
+    ~Socket() { if (handle != vban::net::invalid) vban::net::close(handle); }
 };
 static bool ipv4(const std::string &text, uint32_t &address) {
-    IN_ADDR parsed{};
-    if (InetPtonA(AF_INET, text.c_str(), &parsed) != 1) return false;
-    address = parsed.S_un.S_addr;
+    in_addr parsed{};
+    if (vban::net::parse(AF_INET, text.c_str(), &parsed) != 1) return false;
+    address = parsed.s_addr;
     return true;
 }
 std::string validate(const Config &cfg) {
@@ -44,22 +43,21 @@ const char *state_name(State state) {
 }
 Receiver::Receiver(std::function<uint64_t()> clock, Logger logger)
     : routing_(std::make_shared<Routing>()), clock_(std::move(clock)), logger_(std::move(logger)) {
-    WSADATA data{};
-    if (WSAStartup(MAKEWORD(2,2), &data)) throw std::runtime_error("Winsock initialization failed");
+    if (vban::net::startup()) throw std::runtime_error("Socket initialization failed");
     try {
         network_ = std::thread([this] { try { receive_loop(); } catch (const std::exception &e) { fail(e.what()); } });
         audio_ = std::thread([this] { try { audio_loop(); } catch (const std::exception &e) { fail(e.what()); } });
     } catch (...) {
         stop_ = true; wake_.notify_all();
         if (network_.joinable()) network_.join();
-        WSACleanup();
+        vban::net::cleanup();
         throw;
     }
 }
 Receiver::~Receiver() {
     shutdown();
     routing_.reset();
-    WSACleanup();
+    vban::net::cleanup();
 }
 void Receiver::shutdown() {
     stop_ = true; wake_.notify_all();
@@ -94,28 +92,25 @@ bool Receiver::configure(const Config &cfg, std::string &error, const Save &save
     else if (enabled) {
         auto socket = std::make_shared<Socket>();
         socket->handle = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        BOOL exclusive = TRUE;
-        int receive_size = 1024 * 1024;
-        if (socket->handle == INVALID_SOCKET ||
-            setsockopt(socket->handle, SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
-                       reinterpret_cast<const char *>(&exclusive), sizeof(exclusive)) == SOCKET_ERROR) {
-            error = "Cannot create UDP socket (Winsock " + std::to_string(WSAGetLastError()) + ").";
+        if (socket->handle == vban::net::invalid ||
+            !net::exclusive(socket->handle)) {
+            error = "Cannot create UDP socket (Socket " + std::to_string(vban::net::error()) + ").";
             return false;
         }
-        setsockopt(socket->handle, SOL_SOCKET, SO_RCVBUF,
-                   reinterpret_cast<const char *>(&receive_size), sizeof(receive_size));
+        const int receive_size = net::receive_buffer(socket->handle);
+        if (receive_size < 128 * 1024) { error = "Cannot reserve at least 128 KiB for UDP reception."; return false; }
+        log(false, "UDP receive buffer: " + std::to_string(receive_size) + " bytes.");
         sockaddr_in address{};
         address.sin_family = AF_INET;
         address.sin_addr.s_addr = INADDR_ANY;
         address.sin_port = htons(cfg.port);
-        if (bind(socket->handle, reinterpret_cast<const sockaddr *>(&address), sizeof(address)) == SOCKET_ERROR) {
-            error = "Cannot bind UDP port " + std::to_string(cfg.port) + " (Winsock " +
-                std::to_string(WSAGetLastError()) + "). Another receiver may already use this port.";
+        if (bind(socket->handle, reinterpret_cast<const sockaddr *>(&address), sizeof(address)) == vban::net::failure) {
+            error = "Cannot bind UDP port " + std::to_string(cfg.port) + " (Socket " +
+                std::to_string(vban::net::error()) + "). Another receiver may already use this port.";
             log(true, error);
             return false;
         }
-        u_long nonblocking = 1;
-        if (ioctlsocket(socket->handle, FIONBIO, &nonblocking) == SOCKET_ERROR) {
+        if (!net::nonblocking(socket->handle)) {
             error = "Could not set UDP socket to nonblocking mode.";
             return false;
         }
@@ -141,7 +136,7 @@ bool Receiver::configure(const Config &cfg, std::string &error, const Save &save
     }
     wake_.notify_all();
     log(false, enabled ? "Listening on UDP " + std::to_string(cfg.port) +
-        ". If waiting, check sender IP, stream name, port, Windows Firewall, and the sender's VBAN output."
+        ". If waiting, check sender IP, stream name, port, the firewall, and the sender's VBAN output."
         : "All receive slots are disabled.");
     return true;
 }
@@ -184,18 +179,17 @@ void Receiver::receive_loop() {
             wake_.wait_for(lock, std::chrono::milliseconds(20));
             continue;
         }
-        fd_set readable; FD_ZERO(&readable); FD_SET(route->socket->handle, &readable);
-        timeval timeout{0, 20000};
-        const int ready = select(0, &readable, nullptr, nullptr, &timeout);
-        if (ready == SOCKET_ERROR) { fail("UDP select failed: " + std::to_string(WSAGetLastError())); return; }
+        const int ready = net::readable(route->socket->handle, 20);
+        if (ready == net::failure && net::interrupted(net::error())) continue;
+        if (ready == vban::net::failure) { fail("UDP select failed: " + std::to_string(vban::net::error())); return; }
         if (!ready) continue;
         sockaddr_in sender{};
-        int length = sizeof(sender);
-        const int count = recvfrom(route->socket->handle, reinterpret_cast<char *>(data.data()),
+        vban::net::Length length = sizeof(sender);
+        const auto count = recvfrom(route->socket->handle, reinterpret_cast<char *>(data.data()),
             static_cast<int>(data.size()), 0, reinterpret_cast<sockaddr *>(&sender), &length);
-        if (count == SOCKET_ERROR) {
-            const int code = WSAGetLastError();
-            if (code == WSAEWOULDBLOCK || code == WSAEMSGSIZE || code == WSAECONNRESET) continue;
+        if (count == vban::net::failure) {
+            const int code = vban::net::error();
+            if (net::retry_receive(code)) continue;
             fail("UDP receive failed: " + std::to_string(code)); return;
         }
         {

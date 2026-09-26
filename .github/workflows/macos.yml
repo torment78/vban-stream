@@ -1,0 +1,51 @@
+name: macOS test build
+on:
+  workflow_dispatch:
+  push:
+    branches: [dev]
+    paths:
+      - '.github/workflows/macos.yml'
+      - 'Build-Mac.sh'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'buildspec.json'
+      - 'cmake/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'tools/*macos*'
+      - 'docs/INSTALL-MAC.txt'
+permissions:
+  contents: read
+jobs:
+  build:
+    name: Build and test universal Mac plugin
+    runs-on: macos-15
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install CMake
+        run: |
+          python3 -m venv "$RUNNER_TEMP/vban-tools"
+          "$RUNNER_TEMP/vban-tools/bin/pip" install cmake==4.2.3
+          echo "$RUNNER_TEMP/vban-tools/bin" >> "$GITHUB_PATH"
+      - name: Build, run audio tests, and package
+        run: bash Build-Mac.sh
+      - name: Upload Mac test package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vban-stream-macos-test
+          path: dist/macos/*
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: macos-diagnostics
+          path: |
+            build_macos/Testing/Temporary/*
+            build_macos/CMakeFiles/CMakeConfigureLog.yaml
+            .deps/obs-studio-*/build_universal/CMakeFiles/CMakeConfigureLog.yaml
+          retention-days: 14

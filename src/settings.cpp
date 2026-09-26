@@ -325,7 +325,7 @@ private:
             diagnostic += QString("\nApplied format: Stereo PCM %1-bit").arg(s.pcm_bits);
             diagnostic += QString("\nReturn buffer: %1 ms\nCapture queue peak: %2 / %3 blocks (busiest source)\n"
                 "Clock corrections: %4\nClock discontinuities: %5\nClipped samples: %6\nInvalid float samples: %7\n"
-                "Windows audio priority: %8\nClipping means the combined mix exceeds full scale; lower source faders.")
+                "Audio worker priority: %8\nClipping means the combined mix exceeds full scale; lower source faders.")
                 .arg(s.buffer_ms).arg(s.capture_queue_peak).arg(s.capture_queue_capacity)
                 .arg(s.clock_corrections).arg(s.clock_discontinuities).arg(s.clipped_samples)
                 .arg(s.nonfinite_samples).arg(s.audio_priority ? "Active" : "Unavailable");

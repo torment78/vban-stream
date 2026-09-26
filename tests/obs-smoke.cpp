@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-#include <winsock2.h>
-#include <ws2tcpip.h>
+#include "socket-platform.hpp"
 #include <obs.h>
 #include <obs-properties.h>
 #include <QApplication>
@@ -57,18 +56,18 @@ int main(int argc,char **argv) {
         obs_frontend_set_callbacks_internal(frontend);
         const QString root=QString::fromLocal8Bit(argv[3]);
         QDir().mkpath(root+"/obs-vban-audio");
-        WSADATA wsa{};check(WSAStartup(MAKEWORD(2,2),&wsa)==0,"Winsock startup");
-        SOCKET sender=::socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
-        check(sender!=INVALID_SOCKET,"Sender socket");
+        check(vban::net::startup()==0,"Socket startup");
+        vban::net::Socket sender=::socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
+        check(sender!=vban::net::invalid,"Sender socket");
         sockaddr_in address{};address.sin_family=AF_INET;address.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
         check(bind(sender,reinterpret_cast<sockaddr*>(&address),sizeof(address))==0,"Sender bind");
-        int size=sizeof(address);getsockname(sender,reinterpret_cast<sockaddr*>(&address),&size);
+        vban::net::Length size=sizeof(address);getsockname(sender,reinterpret_cast<sockaddr*>(&address),&size);
         // Find an unused receiving port independently from the sender's source port.
-        SOCKET reservation=::socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
+        vban::net::Socket reservation=::socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
         sockaddr_in destination{};destination.sin_family=AF_INET;destination.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
         check(bind(reservation,reinterpret_cast<sockaddr*>(&destination),sizeof(destination))==0,"Port reservation");
         size=sizeof(destination);getsockname(reservation,reinterpret_cast<sockaddr*>(&destination),&size);
-        closesocket(reservation);
+        vban::net::close(reservation);
         QJsonArray slots;
         for(int i=0;i<8;++i)slots.append(QJsonObject{{"enabled",true},{"label",QString("Stream %1").arg(i+1)},
             {"sender_ip","127.0.0.1"},{"stream_name",QString("S%1").arg(i)}});
@@ -152,7 +151,7 @@ int main(int argc,char **argv) {
             for(int i=0;i<milliseconds/2;++i) {
                 auto bytes=packet(sequence++,name,channels,type);
                 check(sendto(sender,reinterpret_cast<const char*>(bytes.data()),static_cast<int>(bytes.size()),0,
-                    reinterpret_cast<sockaddr*>(&destination),sizeof(destination))!=SOCKET_ERROR,"Send VBAN");
+                    reinterpret_cast<sockaddr*>(&destination),sizeof(destination))!=vban::net::failure,"Send VBAN");
                 app.processEvents(); deadline += std::chrono::milliseconds(2); std::this_thread::sleep_until(deadline);
             }
         };
@@ -203,7 +202,7 @@ int main(int argc,char **argv) {
         obs_source_release(first);obs_source_release(second);obs_data_release(settings);
         obs_shutdown();app.processEvents();
         obs_frontend_set_callbacks_internal(nullptr);
-        closesocket(sender);WSACleanup();
+        vban::net::close(sender);vban::net::cleanup();
         std::cout<<"OBS DLL smoke passed: "<<captures<<" captured blocks, Tools menu, eight slots, live PCM16/24, "
                    "7-channel padding, stable properties, friendly fader names, persistent UI changes, source churn and clean unload.\n";
         return 0;
