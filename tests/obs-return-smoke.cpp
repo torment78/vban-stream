@@ -102,10 +102,16 @@ struct CaptureProbe {
     std::atomic<unsigned> calls{0};
     std::atomic<float> sample{0};
     std::atomic<bool> muted{false};
+    std::atomic<int64_t> max_delay{0},last_delay{0};
     static void capture(void *param, obs_source_t *, const audio_data *audio, bool muted) {
         auto &probe=*static_cast<CaptureProbe*>(param);
         probe.sample=audio->frames && audio->data[0] ? reinterpret_cast<const float*>(audio->data[0])[0] : 0;
         probe.muted=muted; ++probe.calls;
+        const auto delay=static_cast<int64_t>(os_gettime_ns())-static_cast<int64_t>(audio->timestamp);
+        probe.last_delay=delay;
+        auto maximum=probe.max_delay.load();
+        while(delay>maximum && !probe.max_delay.compare_exchange_weak(maximum,delay)) {}
+
     }
 };
 static const char *source_name(void*){return "Return Test Input";}
@@ -229,7 +235,8 @@ int main(int argc,char **argv){
                      <<"; active: "<<obs_source_active(a)<<", "<<obs_source_active(b)
                      <<"; monitoring: "<<obs_source_get_monitoring_type(a)<<", "<<obs_source_get_monitoring_type(b)<<"\n";
             std::cerr<<"Capture probe: "<<probe.calls<<" callbacks, sample "<<probe.sample
-                     <<", muted "<<probe.muted<<"\n";
+                     <<", muted "<<probe.muted<<"; last/max callback delay ms "
+                     <<double(probe.last_delay.load())/1e6<<" / "<<double(probe.max_delay.load())/1e6<<"\n";
             // Force a current snapshot; the UI timer may not fire in this short test step.
             for(auto *timer:dialog->findChildren<QTimer*>())
                 QMetaObject::invokeMethod(timer,"timeout",Qt::DirectConnection);
@@ -315,6 +322,7 @@ int main(int argc,char **argv){
     }
     // Keep sample timestamps continuous while every callback arrives 45 ms late.
     left.read();right.read();left.packets.clear();right.packets.clear();
+    probe.max_delay=0;
     const auto delayed_start=os_gettime_ns()-45000000ULL;
     drive_audio(app,left,right,120,[&](int i){
         const auto ts=delayed_start+static_cast<uint64_t>(i)*10000000ULL;

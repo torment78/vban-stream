@@ -61,7 +61,7 @@ if(BUILD_TESTING)
   add_executable(obs-return-smoke tests/obs-return-smoke.cpp)
   target_compile_definitions(obs-return-smoke PRIVATE QT_NO_KEYWORDS WIN32_LEAN_AND_MEAN NOMINMAX)
   target_include_directories(obs-return-smoke PRIVATE .deps/obs-studio-31.1.1/frontend/api)
-  target_link_libraries(obs-return-smoke PRIVATE OBS::libobs OBS::obs-frontend-api Qt6::Core Qt6::Widgets vban-core)
+  target_link_libraries(obs-return-smoke PRIVATE OBS::libobs OBS::obs-frontend-api Qt6::Core Qt6::Widgets vban-core $<$<PLATFORM_ID:Windows>:avrt>)
   add_dependencies(obs-return-smoke ${CMAKE_PROJECT_NAME})
   add_test(NAME obs-monitor-return COMMAND obs-return-smoke
     $<TARGET_FILE:${CMAKE_PROJECT_NAME}> "${CMAKE_SOURCE_DIR}/data" "${CMAKE_BINARY_DIR}/return-smoke-config")
@@ -75,7 +75,7 @@ if(WIN32 AND BUILD_TESTING AND EXISTS "${CMAKE_SOURCE_DIR}/.deps/obs-api-32.2.1/
   add_executable(obs-return-smoke32 tests/obs-return-smoke.cpp)
   target_compile_definitions(obs-return-smoke32 PRIVATE TEST_OBS32 QT_NO_KEYWORDS WIN32_LEAN_AND_MEAN NOMINMAX)
   target_include_directories(obs-return-smoke32 BEFORE PRIVATE .deps/obs-frontend32)
-  target_link_libraries(obs-return-smoke32 PRIVATE OBS::libobs OBS::obs-frontend-api Qt6::Core Qt6::Widgets vban-core)
+  target_link_libraries(obs-return-smoke32 PRIVATE OBS::libobs OBS::obs-frontend-api Qt6::Core Qt6::Widgets vban-core $<$<PLATFORM_ID:Windows>:avrt>)
   add_dependencies(obs-return-smoke32 ${CMAKE_PROJECT_NAME})
 endif()
 
