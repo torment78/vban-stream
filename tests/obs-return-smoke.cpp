@@ -26,6 +26,8 @@ static constexpr auto test_second_ip = "127.0.0.2";
 #include <QPushButton>
 #include <QSpinBox>
 #include <QWidget>
+#include <QTimer>
+#include <atomic>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -66,6 +68,16 @@ struct Sink {
         const auto start=packets.size()>25?packets.size()-25:0;
         for(size_t i=start;i<packets.size();++i)for(float x:packets[i].samples){sum+=x;++count;}
         return count?sum/count:0;
+    }
+};
+struct CaptureProbe {
+    std::atomic<unsigned> calls{0};
+    std::atomic<float> sample{0};
+    std::atomic<bool> muted{false};
+    static void capture(void *param, obs_source_t *, const audio_data *audio, bool muted) {
+        auto &probe=*static_cast<CaptureProbe*>(param);
+        probe.sample=audio->frames && audio->data[0] ? reinterpret_cast<const float*>(audio->data[0])[0] : 0;
+        probe.muted=muted; ++probe.calls;
     }
 };
 static const char *source_name(void*){return "Return Test Input";}
@@ -122,6 +134,8 @@ int main(int argc,char **argv){
     const auto dll_path = QDir::fromNativeSeparators(QString::fromLocal8Bit(argv[1])).toUtf8();
     check(obs_open_module(&module,dll_path.constData(),argv[2])==MODULE_SUCCESS && obs_init_module(module),"Load return plugin");
     auto *b=obs_source_create("return_test_input","After plugin",nullptr,nullptr);obs_source_inc_active(b);
+    CaptureProbe probe;
+    obs_source_add_audio_capture_callback(a,CaptureProbe::capture,&probe);
     frontend->action->trigger();app.processEvents();
     const auto dialogs=window.findChildren<QDialog*>();check(!dialogs.empty(),"Open settings");
     auto *dialog=dialogs.front();
@@ -188,6 +202,11 @@ int main(int argc,char **argv){
             std::cerr<<"Packets: "<<left.packets.size()<<", "<<right.packets.size()
                      <<"; active: "<<obs_source_active(a)<<", "<<obs_source_active(b)
                      <<"; monitoring: "<<obs_source_get_monitoring_type(a)<<", "<<obs_source_get_monitoring_type(b)<<"\n";
+            std::cerr<<"Capture probe: "<<probe.calls<<" callbacks, sample "<<probe.sample
+                     <<", muted "<<probe.muted<<"\n";
+            // Force a current snapshot; the UI timer may not fire in this short test step.
+            for(auto *timer:dialog->findChildren<QTimer*>())
+                QMetaObject::invokeMethod(timer,"timeout",Qt::DirectConnection);
             for(int i=0;i<2;++i) {
                 const auto *status=dialog->findChild<QLabel*>(QString("return_%1_status").arg(i));
                 std::cerr<<status->text().toStdString()<<"\n"<<status->toolTip().toStdString()<<"\n";
@@ -344,6 +363,7 @@ int main(int argc,char **argv){
     run(250);expect(.3,"Active audio before frontend shutdown");
     frontend->on_event(OBS_FRONTEND_EVENT_EXIT);
     run(150);check(left.packets.empty() && right.packets.empty(),"Frontend exit detaches live sources and stops TX");
+    obs_source_remove_audio_capture_callback(a,CaptureProbe::capture,&probe);
     obs_source_dec_active(a);obs_source_dec_active(b);obs_source_release(a);obs_source_release(b);
     obs_wait_for_destroy_queue();
     obs_shutdown();app.processEvents();obs_frontend_set_callbacks_internal(nullptr);
