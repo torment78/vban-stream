@@ -57,3 +57,15 @@ OBS source interaction support.
 A real VoiceMeeter/Matrix sender over the user's LAN still needs testing. These
 synthetic senders use the documented protocol; they cannot establish every sender
 version's behaviour, LAN packet delivery or sustained production performance.
+
+## 0.3.0 results (6 October 2026)
+
+Source commit: `678e76b969e40253477ae456978fe76afc57f57a`.
+Windows: 13/13 CTest checks, OBS 32.2.1 return/video/1–8-channel tests, and
+53/53 installer checks passed. The installer and both manual packages contain
+the same tested DLL (SHA256 `28de5e1a7f727980576f04331449784f2eb8528869dbda7a5b8ae0e95a58617a`).
+
+[Mac build and Intel validation](https://github.com/torment78/vban-stream/actions/runs/37513302602)
+passed: 13/13 tests on Apple Silicon, followed by the same packaged plugin's
+protocol, video UDP, UI/module, monitor-return and multichannel tests on Intel.
+The D3D11 rendering test is Windows-only; Mac OBS GUI/video display remains a user test.

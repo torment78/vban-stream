@@ -1,5 +1,9 @@
 # VBAN Stream 0.3.0 — development preview
 
+**Installers:** [Windows setup](https://github.com/torment78/vban-stream/releases/download/v0.3.0/vban-stream-0.3.0-windows-x64-setup.exe) · [Mac universal PKG](https://github.com/torment78/vban-stream/releases/download/v0.3.0/vban-stream-0.3.0-macos-universal-test.pkg)
+
+Manual binary ZIPs and the text installation guides are available below.
+
 Display a VoiceMeeter App View or another VBAN-Frame video feed directly in OBS.
 Configure two inputs in **Tools → VBAN Stream Settings → Video inputs**, then add
 **VBAN Video** from the Sources menu and choose one of those inputs.
@@ -25,3 +29,5 @@ counters if reception fails or frames are skipped.
 Support: https://discord.gg/AAhxYKzmkz
 Website: https://elkasoft.xyz/
 Donate: https://ko-fi.com/msffixit
+
+Validation: 13 automated tests on Windows; OBS 32.2.1 monitor-return, 1–8-channel audio and real D3D11 video-output checks; 53 Windows installer checks. Universal Mac builds run the protocol, UDP, module and audio tests on Apple Silicon and Intel. A real VoiceMeeter/Matrix LAN video session and sustained listening still need user testing.

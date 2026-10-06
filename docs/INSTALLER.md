@@ -1,6 +1,6 @@
 # Windows installer
 
-The EXE is the dark installer package for the 0.2.5 pre-release. It contains the
+The EXE is the dark installer package for the 0.3.0 pre-release. It contains the
 same tested plugin DLL as the ZIP downloads.
 
 ## Build
@@ -21,7 +21,7 @@ Packaging also converts the existing plugin PNG into a multi-resolution Windows
 ICO and embeds it in Setup/Uninstall. The Installed apps entry uses the uninstaller's
 matching icon. All seven ICO frame payloads were verified in the compiled setup EXE.
 
-Output: `dist\vban-stream-0.2.5-windows-x64-setup.exe`.
+Output: `dist\vban-stream-0.3.0-windows-x64-setup.exe`.
 
 ## Appearance
 
