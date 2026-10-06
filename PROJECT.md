@@ -1,10 +1,12 @@
 # VBAN Stream
 
-Native Windows x64 OBS plugin: eight shared VBAN receive slots and two independent
-monitor-mix returns. Build with Visual Studio 2026 and the windows-x64 CMake preset.
+Native Windows x64/macOS OBS plugin: eight shared VBAN audio receive slots, two
+VBAN-Frame video inputs, and two independent monitor-mix returns. Build Windows
+with Visual Studio 2026 and the windows-x64 CMake preset; use Build-Mac.sh for macOS.
 
 See README.md for installation/building, docs/MONITOR-RETURN-ENGINEERING.md for
-architecture, and docs/AUDIO-REVIEW-0.2.2.md for validation and known limits.
+audio architecture, docs/VIDEO-RECEIVE.md for video, and docs/AUDIO-REVIEW-0.2.2.md
+for the previous audio review.
 
 ## Release downloads
 

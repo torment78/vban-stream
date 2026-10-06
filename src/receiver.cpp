@@ -30,6 +30,17 @@ std::string validate(const Config &cfg) {
         if (!definitions.emplace(address, cfg.slots[i].stream_name).second)
             return prefix + "This sender and stream are already configured. Select the same slot in multiple OBS sources instead.";
     }
+    definitions.clear();
+    for (size_t i = 0; i < video_slot_count; ++i) {
+        const auto &s = cfg.videos[i];
+        if (!s.enabled) continue;
+        const auto prefix = "Video " + std::to_string(i + 1) + ": ";
+        uint32_t address = 0;
+        if (!ipv4(s.sender_ip, address)) return prefix + "Enter a valid sender IPv4 address.";
+        if (!valid_stream_name(s.stream_name)) return prefix + "Stream name must contain 1 to 16 printable ASCII characters.";
+        if (!definitions.emplace(address, s.stream_name).second)
+            return prefix + "This video stream is already configured. Select the same slot in multiple OBS video sources.";
+    }
     return {};
 }
 const char *state_name(State state) {
@@ -41,8 +52,8 @@ const char *state_name(State state) {
     }
     return "Error";
 }
-Receiver::Receiver(std::function<uint64_t()> clock, Logger logger)
-    : routing_(std::make_shared<Routing>()), clock_(std::move(clock)), logger_(std::move(logger)) {
+Receiver::Receiver(std::function<uint64_t()> clock, Logger logger, std::shared_ptr<VideoSink> video)
+    : routing_(std::make_shared<Routing>()), clock_(std::move(clock)), logger_(std::move(logger)), video_(std::move(video)) {
     if (vban::net::startup()) throw std::runtime_error("Socket initialization failed");
     try {
         network_ = std::thread([this] { try { receive_loop(); } catch (const std::exception &e) { fail(e.what()); } });
@@ -87,7 +98,10 @@ bool Receiver::configure(const Config &cfg, std::string &error, const Save &save
     next->config = cfg;
     for (size_t i = 0; i < slot_count; ++i)
         if (cfg.slots[i].enabled) ipv4(cfg.ip(i), next->addresses[i]);
-    const bool enabled = std::any_of(cfg.slots.begin(), cfg.slots.end(), [](const auto &s) { return s.enabled; });
+    for (size_t i = 0; i < video_slot_count; ++i)
+        if (cfg.videos[i].enabled) ipv4(cfg.videos[i].sender_ip, next->video_addresses[i]);
+    const bool enabled = std::any_of(cfg.slots.begin(), cfg.slots.end(), [](const auto &s) { return s.enabled; }) ||
+        std::any_of(cfg.videos.begin(), cfg.videos.end(), [](const auto &s) { return s.enabled; });
     if (enabled && old->socket && old->config.port == cfg.port) next->socket = old->socket;
     else if (enabled) {
         auto socket = std::make_shared<Socket>();
@@ -131,6 +145,7 @@ bool Receiver::configure(const Config &cfg, std::string &error, const Save &save
                 slots_[i].was_receiving = false;
             }
         }
+        if (video_) video_->configure(cfg.videos, cfg.port);
         routing_ = std::move(next);
         fatal_error_.clear();
     }
@@ -199,6 +214,19 @@ void Receiver::receive_loop() {
         }
         std::string name;
         if (!read_stream_name(data.data(), static_cast<size_t>(count), name)) continue;
+        if ((data[4] & 0xe0) == 0x80) {
+            // Keep configure and enqueue ordered; decoding happens on the video worker.
+            std::lock_guard lock(config_mutex_);
+            if (route->generation != generation_.load()) continue;
+            if (video_) for (size_t i = 0; i < video_slot_count; ++i) {
+                const auto &s = route->config.videos[i];
+                if (s.enabled && route->video_addresses[i] == sender.sin_addr.s_addr && s.stream_name == name)
+                    video_->enqueue(i, data.data(), static_cast<size_t>(count), clock_());
+            }
+            continue;
+        }
+        // Different VBAN protocols may intentionally share an audio stream's name.
+        if ((data[4] & 0xe0) != 0) continue;
         for (size_t i = 0; i < slot_count; ++i) {
             if (!route->config.slots[i].enabled || sender.sin_addr.s_addr != route->addresses[i] ||
                 name != route->config.slots[i].stream_name) continue;

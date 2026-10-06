@@ -1,9 +1,9 @@
-VBAN Stream 0.2.5 - Installation and usage
+VBAN Stream 0.3.0 - Installation and usage
 
 INSTALLER (STANDARD OR PORTABLE OBS)
 
 1. Close all OBS Studio windows.
-2. Run vban-stream-0.2.5-windows-x64-setup.exe.
+2. Run vban-stream-0.3.0-windows-x64-setup.exe.
    Approve the Windows administrator prompt. Protected folders such as
    Program Files need administrator access.
 3. Select one option:
@@ -35,10 +35,10 @@ The plugin works with normal and portable OBS Studio on Windows x64.
 Both ZIP files contain the same plugin DLL, arranged for different install paths.
 Install only one copy.
 
-- vban-stream-0.2.5-obs-root.zip:
+- vban-stream-0.3.0-obs-root.zip:
   Merge into the OBS installation folder. Works with normal AND portable OBS.
 
-- vban-stream-0.2.5-windows-x64.zip:
+- vban-stream-0.3.0-windows-x64.zip:
   Copy the obs-vban-audio folder into C:\ProgramData\obs-studio\plugins
   for a normal OBS installation.
 
@@ -99,6 +99,37 @@ Windows x64, OBS Studio x64, and the Microsoft Visual C++ x64 runtime.
 Tested with OBS 31.1.1 and OBS 32.2.1. The downloads are unsigned.
 Use OBS's own libobs, frontend API and Qt DLLs; do not copy development SDK
 libraries into an OBS installation.
+
+RECEIVE VIDEO IN OBS
+
+1. On the sending computer, enable a VBAN-Frame output in VoiceMeeter, Matrix,
+   or another compatible sender. Choose App View or a display, and JPEG or PNG.
+2. Send it to this OBS computer's IPv4 address and UDP listen port (default 6980).
+   Audio and video share this port. Use separate video stream names for two views.
+3. In OBS, open Tools > VBAN Stream Settings > Video inputs.
+4. Enable Video 1 and/or Video 2. Enter each sender's IPv4 address and its exact,
+   case-sensitive VBAN stream name. A Friendly name makes it easier to identify.
+5. Click Apply. Live status changes to Receiving and shows the resolution/format
+   when a complete image has arrived and decoded.
+6. In the OBS Sources panel, click + > VBAN Video. Choose the configured video.
+   Add another VBAN Video source to display the second view. Resize/crop normally.
+
+There are two independent video inputs in addition to the eight audio inputs.
+JPEG and PNG are detected automatically. Each image can be up to 4096 x 2160,
+including portrait orientation within the same pixel limit. PNG transparency is
+preserved. Images stay in their original colours; the setup window is dark.
+Before reception, the source shows a black 1280 x 720 picture. It uses the image's
+native dimensions after reception. After three seconds without a complete image,
+it goes black while retaining the last dimensions, and recovers automatically.
+
+Video sources contain no audio. Add the normal VBAN Stream audio source if needed.
+Remote mouse control is not included in this development build.
+
+If Waiting continues, match the sender IP, stream name and shared UDP port, and
+allow incoming UDP for OBS on your LAN. Hover over Live status for decoded frames,
+incomplete frames, decode errors and queue drops. Lost/incomplete images are
+skipped instead of shown partially. If these counters keep increasing, try a lower
+frame rate/resolution or JPEG instead of PNG, and check the network connection.
 
 RECEIVE AUDIO IN OBS
 

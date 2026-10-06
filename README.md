@@ -4,12 +4,14 @@
 
 # VBAN Stream
 
-**Eight VBAN audio inputs and two monitor-mix returns for OBS Studio on Windows x64.**
+**Eight VBAN audio inputs, two video inputs and two monitor-mix returns for OBS Studio.**
 
 An independent plugin by **ElkaSoft** for OBS Studio.
 
 Receive named VBAN streams with 1–8 channels each directly in OBS. Send the OBS monitoring mix back to
 two computers, each with its own destination address, UDP port, and stream name.
+The 0.3.0 development code also receives two VBAN-Frame video feeds, such as a
+VoiceMeeter App View or a remote display, on Windows x64 and macOS.
 
 [**Windows installer — stable 0.2.2**](https://github.com/torment78/vban-stream/releases/download/v0.2.2/obs-vban-audio-0.2.2-windows-x64-setup.exe)
  · [Windows installer — development 0.2.5](https://github.com/torment78/vban-stream/releases/download/v0.2.5/vban-stream-0.2.5-windows-x64-setup.exe)
@@ -120,6 +122,32 @@ the same slot without creating extra network receivers.
 
 One sender/name pair should occupy one enabled slot. Stream names allow 1–16
 printable ASCII characters. The stream dropdown stays open while you select it.
+
+## Receive VBAN video in OBS
+
+1. On the sender, choose a **VBAN-Frame** output, **App View** or a display, and **JPEG** or **PNG**.
+2. Send to the OBS computer's IPv4 address and its UDP listen port (default **6980**).
+3. Open **Tools → VBAN Stream Settings → Video inputs**. Enable Video 1 and/or Video 2.
+4. Enter each sender's IP and exact stream name. Give each input a friendly name, then **Apply**.
+5. Choose **Sources + → VBAN Video** and select the configured input. Add a second source for the other view.
+
+The two video inputs are separate from the eight audio slots. Both use the same
+UDP listen port. Status shows **Receiving**, resolution and JPEG/PNG after a
+complete picture has decoded. Formats are detected automatically; images retain
+their original colours and PNG transparency. The settings window uses a dark theme.
+
+Video is displayed at its native resolution, up to a 4096 × 2160 image or the same
+pixel count in portrait orientation. Before reception, a source shows a black
+1280 × 720 picture. After three seconds without a complete frame it goes black at
+its last dimensions, then recovers automatically when reception resumes.
+
+Each video source is video-only. Add **VBAN Stream** for accompanying audio.
+**Remote mouse control is not included** in this development build.
+
+Hover over a video's status for incomplete frames, decode errors and queue drops.
+If these rise steadily, reduce the sender's frame rate/resolution, try JPEG, and
+check the LAN. Incomplete images are dropped without displaying partial pictures.
+[Protocol and testing details](docs/VIDEO-RECEIVE.md).
 
 ## Send the monitor mix back
 

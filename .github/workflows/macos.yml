@@ -36,7 +36,7 @@ jobs:
         with:
           path: .deps
           key: macos-universal-obs31.1.1-20250711-xcode16.4-v1
-      - name: Build, run audio tests, and package
+      - name: Build, run audio/video tests, and package
         run: bash Build-Mac.sh
       - name: Save pinned SDK cache
         if: always() && steps.sdk-cache.outputs.cache-hit != 'true'

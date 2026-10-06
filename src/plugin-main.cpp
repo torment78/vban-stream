@@ -12,7 +12,7 @@
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("obs-vban-audio", "en-US")
 MODULE_EXPORT const char *obs_module_description(void) {
-    return "Native VBAN PCM audio receiver with eight shared stream slots.";
+    return "VBAN audio and video receiver with eight audio slots, two video slots and two monitor returns.";
 }
 MODULE_EXPORT const char *obs_module_name(void) { return "VBAN Stream"; }
 
@@ -20,6 +20,7 @@ namespace {
 using namespace vban;
 std::shared_ptr<Receiver> receiver;
 std::shared_ptr<MonitorReturn> monitor_return;
+std::shared_ptr<VideoReceiver> video_receiver;
 Config desired_config;
 std::string startup_error;
 QPointer<QDialog> settings_dialog;
@@ -142,7 +143,7 @@ void show_settings() {
     if (!receiver) return;
     if (!settings_dialog) {
         settings_dialog = make_settings_dialog(static_cast<QWidget *>(obs_frontend_get_main_window()),
-            receiver, desired_config, monitor_return, [](const Config &cfg, std::string &error) {
+            receiver, desired_config, monitor_return, video_receiver, [](const Config &cfg, std::string &error) {
                 auto prepared = monitor_return->prepare(cfg.returns, error, cfg.return_local_ip, cfg.return_buffer_ms);
                 if (!prepared || !receiver->configure(cfg, error, write_config)) return false;
                 monitor_return->activate(std::move(prepared), cfg.return_buffer_ms);
@@ -200,6 +201,136 @@ obs_properties_t *properties(void *data) {
     obs_properties_add_button(props, "settings", "Open VBAN Settings", open_settings);
     return props;
 }
+
+int video_selected(obs_data_t *settings) {
+    const auto slot = obs_data_get_int(settings, "slot");
+    return slot >= 0 && slot < int(video_slot_count) ? static_cast<int>(slot) : -1;
+}
+struct VideoSource {
+    std::shared_ptr<VideoReceiver> video;
+    std::shared_ptr<Receiver> manager;
+    std::shared_ptr<WeakSource> weak;
+    obs_source_t *source = nullptr; // OBS owns the source throughout its callbacks.
+    std::mutex mutex;
+    int slot = -1;
+    uint64_t serial = 0;
+    int width = 1280, height = 720;
+    bool showing_black = false;
+};
+const char *video_name(void *) { return "VBAN Video"; }
+void *video_create(obs_data_t *settings, obs_source_t *source) {
+    if (!video_receiver || !receiver) return nullptr;
+    auto data = std::make_unique<VideoSource>();
+    data->video = video_receiver; data->manager = receiver; data->source = source;
+    data->slot = video_selected(settings); data->weak = std::make_shared<WeakSource>(source);
+    { std::lock_guard lock(sources_mutex); sources.emplace_back(data->weak); }
+    obs_source_set_async_unbuffered(source, true);
+    return data.release();
+}
+void video_destroy(void *data) { delete static_cast<VideoSource *>(data); }
+void video_update(void *opaque, obs_data_t *settings) {
+    auto &data = *static_cast<VideoSource *>(opaque);
+    const int slot = video_selected(settings);
+    {
+        std::lock_guard lock(data.mutex);
+        if (data.slot != slot) {
+            data.slot = slot; data.serial = 0; data.showing_black = false;
+        }
+    }
+    if (slot < 0) return;
+    auto *metadata = obs_source_get_private_settings(data.source);
+    const std::string current = obs_source_get_name(data.source);
+    const std::string previous = obs_data_get_string(metadata, "vban_video_auto_name");
+    const std::string prefix = "VBAN Video ";
+    const bool default_name = current == "VBAN Video" || (current.size() > prefix.size() &&
+        current.compare(0, prefix.size(), prefix) == 0 &&
+        std::all_of(current.begin() + prefix.size(), current.end(), [](char c) { return c >= '0' && c <= '9'; }));
+    if ((!previous.empty() && current == previous) || (previous.empty() && default_name)) {
+        const auto cfg = data.manager->config().videos[slot];
+        const auto label = cfg.label.empty() ? cfg.stream_name : cfg.label;
+        if (!label.empty()) {
+            obs_source_set_name(data.source, label.c_str());
+            obs_data_set_string(metadata, "vban_video_auto_name", obs_source_get_name(data.source));
+        }
+    }
+    obs_data_release(metadata);
+}
+void video_tick(void *opaque, float) {
+    auto &data = *static_cast<VideoSource *>(opaque);
+    std::lock_guard lock(data.mutex);
+    const auto snapshot = data.video->snapshot(data.slot);
+    if (snapshot.image.isNull()) {
+        if (data.showing_black) return;
+        // Keep the source usable in a scene before reception and on signal loss.
+        // Preserve its last dimensions, with an opaque black waiting picture.
+        QImage black(data.width, data.height, QImage::Format_RGBA8888);
+        if (black.isNull()) return;
+        black.fill(Qt::black);
+        obs_source_frame frame{};
+        frame.data[0] = black.bits(); frame.linesize[0] = static_cast<uint32_t>(black.bytesPerLine());
+        frame.width = static_cast<uint32_t>(data.width); frame.height = static_cast<uint32_t>(data.height);
+        frame.format = VIDEO_FORMAT_RGBA; frame.full_range = true; frame.timestamp = os_gettime_ns();
+        obs_source_output_video(data.source, &frame);
+        data.serial = 0; data.showing_black = true;
+        return;
+    }
+    if (snapshot.serial == data.serial) return;
+    obs_source_frame frame{};
+    frame.data[0] = const_cast<uint8_t *>(snapshot.image.constBits());
+    frame.linesize[0] = static_cast<uint32_t>(snapshot.image.bytesPerLine());
+    frame.width = static_cast<uint32_t>(snapshot.image.width());
+    frame.height = static_cast<uint32_t>(snapshot.image.height());
+    frame.format = VIDEO_FORMAT_RGBA; frame.full_range = true;
+    frame.timestamp = snapshot.timestamp;
+    obs_source_output_video(data.source, &frame);
+    data.serial = snapshot.serial; data.showing_black = false;
+    data.width = snapshot.image.width(); data.height = snapshot.image.height();
+}
+std::string video_status_text(int slot) {
+    if (slot < 0 || !video_receiver) return "Choose a video configured in Tools > VBAN Stream Settings > Video inputs.";
+    const auto s = video_receiver->status(static_cast<size_t>(slot));
+    std::string text = !s.enabled ? "Disabled" : s.receiving ? "Receiving" : "Waiting";
+    if (s.receiving) text += " - " + std::to_string(s.width) + " x " + std::to_string(s.height) + " - " + s.format;
+    // Plain status only; network-supplied decode errors are shown as plain text in the main settings.
+    text += ". Decoded frames: " + std::to_string(s.decoded) + "; incomplete: " +
+        std::to_string(s.packets.incomplete) + "; decode errors: " + std::to_string(s.decode_errors) + ".";
+    return text;
+}
+bool video_selection_changed(void *, obs_properties_t *props, obs_property_t *, obs_data_t *settings) {
+    obs_property_set_description(obs_properties_get(props, "status"), video_status_text(video_selected(settings)).c_str());
+    return true;
+}
+bool video_refresh(obs_properties_t *props, obs_property_t *, void *opaque) {
+    int slot = -1;
+    if (opaque) { auto &data = *static_cast<VideoSource *>(opaque); std::lock_guard lock(data.mutex); slot = data.slot; }
+    obs_property_set_description(obs_properties_get(props, "status"), video_status_text(slot).c_str());
+    return true;
+}
+obs_properties_t *video_properties(void *opaque) {
+    auto *props = obs_properties_create();
+    auto *list = obs_properties_add_list(props, "slot", "VBAN video input", OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
+    obs_property_list_add_int(list, "Select a video", -1);
+    int current = -1;
+    if (opaque) { auto &data = *static_cast<VideoSource *>(opaque); std::lock_guard lock(data.mutex); current = data.slot; }
+    if (receiver) {
+        const auto cfg = receiver->config();
+        for (size_t i = 0; i < video_slot_count; ++i) {
+            const auto &v = cfg.videos[i];
+            if (!v.enabled && current != int(i)) continue;
+            auto title = "Video " + std::to_string(i + 1) + " - " +
+                (v.label.empty() ? v.stream_name : v.label + " (" + v.stream_name + ")");
+            if (!v.enabled) title += " [Disabled]";
+            const auto entry = obs_property_list_add_int(list, title.c_str(), static_cast<long long>(i));
+            if (!v.enabled) obs_property_list_item_disable(list, entry, true);
+        }
+    }
+    obs_property_set_modified_callback2(list, video_selection_changed, nullptr);
+    obs_properties_add_text(props, "status", video_status_text(current).c_str(), OBS_TEXT_INFO);
+    obs_properties_add_button(props, "refresh", "Refresh status", video_refresh);
+    obs_properties_add_button(props, "settings", "Open VBAN Settings", open_settings);
+    return props;
+}
+
 void close_ui() {
     delete settings_dialog.data();
     delete settings_action.data();
@@ -208,16 +339,18 @@ void frontend_event(obs_frontend_event event, void *) {
     if (event == OBS_FRONTEND_EVENT_EXIT) {
         close_ui();
         if (monitor_return) monitor_return->shutdown();
+        if (video_receiver) video_receiver->shutdown();
     }
 }
 }
 
 bool obs_module_load(void) {
     try {
+        video_receiver = std::make_shared<VideoReceiver>([] { return os_gettime_ns(); });
         receiver = std::make_shared<vban::Receiver>([] { return os_gettime_ns(); },
             [](bool warning, const std::string &message) {
                 blog(warning ? LOG_WARNING : LOG_INFO, "[obs-vban-audio] %s", message.c_str());
-            });
+            }, video_receiver);
         desired_config = vban::read_config(startup_error);
         if (startup_error.empty()) receiver->configure(desired_config, startup_error);
         if (!startup_error.empty()) blog(LOG_WARNING, "[obs-vban-audio] %s", startup_error.c_str());
@@ -243,6 +376,13 @@ bool obs_module_load(void) {
         info.get_name = source_name; info.create = create; info.destroy = destroy;
         info.get_defaults = defaults; info.get_properties = properties; info.update = update;
         obs_register_source(&info);
+        obs_source_info video_info{};
+        video_info.id = "vban_video_input"; video_info.type = OBS_SOURCE_TYPE_INPUT;
+        video_info.output_flags = OBS_SOURCE_ASYNC_VIDEO;
+        video_info.get_name = video_name; video_info.create = video_create; video_info.destroy = video_destroy;
+        video_info.get_defaults = defaults; video_info.get_properties = video_properties;
+        video_info.update = video_update; video_info.video_tick = video_tick;
+        obs_register_source(&video_info);
         settings_action = static_cast<QAction *>(obs_frontend_add_tools_menu_qaction("VBAN Stream Settings"));
         QObject::connect(settings_action, &QAction::triggered, settings_action, [] { show_settings(); });
         obs_frontend_add_event_callback(frontend_event, nullptr);
@@ -250,7 +390,7 @@ bool obs_module_load(void) {
         return true;
     } catch (const std::exception &e) {
         blog(LOG_ERROR, "[obs-vban-audio] Load failed: %s", e.what());
-        close_ui(); monitor_return.reset(); receiver.reset(); return false;
+        close_ui(); monitor_return.reset(); receiver.reset(); video_receiver.reset(); return false;
     }
 }
 void obs_module_unload(void) {
@@ -260,5 +400,7 @@ void obs_module_unload(void) {
     monitor_return.reset();
     if (receiver) receiver->shutdown();
     receiver.reset();
+    if (video_receiver) video_receiver->shutdown();
+    video_receiver.reset();
     blog(LOG_INFO, "[obs-vban-audio] Unloaded");
 }

@@ -2,6 +2,7 @@
 #pragma once
 #include "stream-buffer.hpp"
 #include "return-config.hpp"
+#include "video-config.hpp"
 #include <atomic>
 #include <condition_variable>
 #include <functional>
@@ -19,6 +20,7 @@ struct Config {
     std::string sender_ip;
     uint16_t port = 6980;
     std::array<SlotConfig, slot_count> slots;
+    VideoConfigs videos;
     ReturnConfigs returns = default_returns();
     uint32_t return_buffer_ms = default_return_buffer_ms;
     std::string return_local_ip; // Empty: let Windows select the sending adapter.
@@ -42,7 +44,7 @@ public:
         std::atomic<int> slot{-1};
         std::function<void(const AudioBlock &)> output;
     };
-    explicit Receiver(std::function<uint64_t()> clock, Logger logger = {});
+    explicit Receiver(std::function<uint64_t()> clock, Logger logger = {}, std::shared_ptr<VideoSink> video = {});
     ~Receiver();
     void shutdown();
     Receiver(const Receiver &) = delete;
@@ -64,6 +66,7 @@ private:
     struct Routing {
         Config config;
         std::array<uint32_t, slot_count> addresses{};
+        std::array<uint32_t, video_slot_count> video_addresses{};
         std::shared_ptr<Socket> socket;
         uint64_t generation = 0;
     };
@@ -80,6 +83,7 @@ private:
     std::vector<std::shared_ptr<Consumer>> consumers_;
     std::function<uint64_t()> clock_;
     Logger logger_;
+    std::shared_ptr<VideoSink> video_;
     std::atomic<bool> stop_{false};
     std::atomic<uint64_t> generation_{0};
     std::mutex wait_mutex_;

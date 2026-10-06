@@ -17,6 +17,7 @@
 #include <QPushButton>
 #include <QThread>
 #include <QWidget>
+#include <QTabWidget>
 #include <atomic>
 #include <chrono>
 #include <thread>
@@ -170,6 +171,13 @@ int main(int argc,char **argv) {
         check(receiving->text() == "Receiving: 2 / 8 streams", "Distinct live streams are counted independently");
         check(input_channels && input_channels->text() == "4", "Input count is preserved when OBS output is stereo");
         dialog->grab().save(root+"/settings-dialog.png");
+        auto *video_enabled = dialog->findChild<QCheckBox *>("video_0_enabled");
+        auto *video_ip = dialog->findChild<QLineEdit *>("video_0_ip");
+        auto *video_stream = dialog->findChild<QLineEdit *>("video_0_name");
+        auto *video_label = dialog->findChild<QLineEdit *>("video_0_label");
+        auto *video_second = dialog->findChild<QCheckBox *>("video_1_enabled");
+        check(video_enabled && video_ip && video_stream && video_label && video_second, "Two video inputs in main settings");
+        video_enabled->setChecked(true); video_ip->setText("127.0.0.1"); video_stream->setText("VIDEO1"); video_label->setText("Mixer screen");
         stream->setText("CHANGED");
         auto *buttons=dialog->findChild<QDialogButtonBox*>();
         buttons->button(QDialogButtonBox::Apply)->click();app.processEvents();
@@ -177,6 +185,19 @@ int main(int argc,char **argv) {
         check(file.open(QIODevice::ReadOnly),"Read persisted settings");
         const auto saved=QJsonDocument::fromJson(file.readAll()).object();file.close();
         check(saved.value("slots").toArray()[0].toObject().value("stream_name")=="CHANGED","Settings save atomically");
+        check(saved.value("videos").toArray().size()==2, "Two video slots persisted with audio settings");
+        check(saved.value("videos").toArray()[0].toObject().value("stream_name")=="VIDEO1", "Video stream setup saved");
+        check(std::string(obs_source_get_display_name("vban_video_input"))=="VBAN Video", "Separate VBAN Video Add Source entry");
+        auto *video_source=obs_source_create("vban_video_input","VBAN Video",nullptr,nullptr);
+        check(video_source && (obs_source_get_output_flags(video_source)&OBS_SOURCE_ASYNC_VIDEO)==OBS_SOURCE_ASYNC_VIDEO, "Native asynchronous video source");
+        check(!(obs_source_get_output_flags(video_source)&OBS_SOURCE_AUDIO), "Video does not create another audio mixer input");
+        obs_source_update(video_source,settings);
+        auto *video_props=obs_source_properties(video_source);
+        check(obs_property_list_item_count(obs_properties_get(video_props,"slot"))==2, "Configured video slot appears in source picker");
+        obs_properties_destroy(video_props);
+        auto *tabs=dialog->findChild<QTabWidget *>("vban_tabs");check(tabs,"Video tab exists");
+        tabs->setCurrentIndex(1);app.processEvents();dialog->grab().save(root+"/video-settings-dialog.png");
+        tabs->setCurrentIndex(0);obs_source_release(video_source);
         const int before=a.count;
         send("CHANGED",600,2,2);
         check(a.count>before+10,"PCM24 after live stream change reaches OBS");

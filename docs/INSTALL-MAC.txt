@@ -1,4 +1,4 @@
-VBAN STREAM 0.2.6 - MAC TEST BUILD
+VBAN STREAM 0.3.0 - MAC TEST BUILD
 by ElkaSoft
 
 REQUIREMENTS
@@ -8,7 +8,7 @@ This is a test release. A real OBS session and sustained LAN audio test are requ
 
 INSTALL WITH THE PKG
 1. Quit OBS Studio.
-2. Open vban-stream-0.2.6-macos-universal-test.pkg and follow the installer.
+2. Open vban-stream-0.3.0-macos-universal-test.pkg and follow the installer.
 3. Install for your current user. The plugin goes here:
    ~/Library/Application Support/obs-studio/plugins/obs-vban-audio.plugin
 4. Restart OBS. Open Tools > VBAN Stream Settings.
@@ -33,6 +33,37 @@ codesign --force --sign - --timestamp=none "$HOME/Library/Application Support/ob
 The first command can report that no quarantine attribute exists; that simply
 means it was not quarantined. Restart OBS after signing. Do not disable Gatekeeper
 or change security settings for the entire computer.
+
+RECEIVE VIDEO IN OBS
+
+1. On the sending computer, enable a VBAN-Frame output in VoiceMeeter, Matrix,
+   or another compatible sender. Choose App View or a display, and JPEG or PNG.
+2. Send it to this OBS computer's IPv4 address and UDP listen port (default 6980).
+   Audio and video share this port. Use separate video stream names for two views.
+3. In OBS, open Tools > VBAN Stream Settings > Video inputs.
+4. Enable Video 1 and/or Video 2. Enter each sender's IPv4 address and its exact,
+   case-sensitive VBAN stream name. A Friendly name makes it easier to identify.
+5. Click Apply. Live status changes to Receiving and shows the resolution/format
+   when a complete image has arrived and decoded.
+6. In the OBS Sources panel, click + > VBAN Video. Choose the configured video.
+   Add another VBAN Video source to display the second view. Resize/crop normally.
+
+There are two independent video inputs in addition to the eight audio inputs.
+JPEG and PNG are detected automatically. Each image can be up to 4096 x 2160,
+including portrait orientation within the same pixel limit. PNG transparency is
+preserved. Images stay in their original colours; the setup window is dark.
+Before reception, the source shows a black 1280 x 720 picture. It uses the image's
+native dimensions after reception. After three seconds without a complete image,
+it goes black while retaining the last dimensions, and recovers automatically.
+
+Video sources contain no audio. Add the normal VBAN Stream audio source if needed.
+Remote mouse control is not included in this development build.
+
+If Waiting continues, match the sender IP, stream name and shared UDP port, and
+allow incoming UDP for OBS on your LAN. Hover over Live status for decoded frames,
+incomplete frames, decode errors and queue drops. Lost/incomplete images are
+skipped instead of shown partially. If these counters keep increasing, try a lower
+frame rate/resolution or JPEG instead of PNG, and check the network connection.
 
 RECEIVE AUDIO
 Open Tools > VBAN Stream Settings. Set the sender's IPv4 address, UDP port, and the exact
@@ -60,6 +91,8 @@ TEST CHECKLIST
 - Confirm the plugin appears in Tools and in Add Source, and settings survive restart.
 - Test receiving mono, stereo, and eight channels with PCM16 and PCM24.
 - Confirm the source picker stays open while status indicators update.
+- Test both VBAN Video inputs together with JPEG and PNG, then stop/restart a sender.
+- Check the waiting picture is black and source selection survives OBS restart.
 - Test both returns separately, then together, in PCM16 and PCM24.
 - Check source volume, mute, monitoring modes, and audio/video sync adjustments.
 - Confirm the selected source IP matches packets arriving on the receiver.

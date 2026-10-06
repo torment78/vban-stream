@@ -24,6 +24,7 @@
 #include <QPushButton>
 #include <QSaveFile>
 #include <QSpinBox>
+#include <QTabWidget>
 #include <QTimer>
 #include <QVBoxLayout>
 
@@ -60,6 +61,12 @@ Config read_config(std::string &error) {
         cfg.slots[i] = {s.value("enabled").toBool(), s.value("label").toString().toStdString(),
             s.value("sender_ip").toString().toStdString(), s.value("stream_name").toString().toStdString()};
     }
+    const auto videos = root.value("videos").toArray();
+    for (int i = 0; i < std::min(videos.size(), qsizetype(video_slot_count)); ++i) {
+        const auto item = videos[i].toObject();
+        cfg.videos[i] = {item.value("enabled").toBool(), item.value("label").toString().toStdString(),
+            item.value("sender_ip").toString().toStdString(), item.value("stream_name").toString().toStdString()};
+    }
     const int buffer = root.value("return_buffer_ms").toInt(default_return_buffer_ms);
     cfg.return_buffer_ms = buffer >= int(min_return_buffer_ms) && buffer <= int(max_return_buffer_ms)
         ? static_cast<uint32_t>(buffer) : 0;
@@ -87,6 +94,10 @@ bool write_config(const Config &cfg, std::string &error) {
     for (const auto &s : cfg.slots) slots.append(QJsonObject{
         {"enabled", s.enabled}, {"label", QString::fromStdString(s.label)},
         {"sender_ip", QString::fromStdString(s.sender_ip)}, {"stream_name", QString::fromStdString(s.stream_name)}});
+    QJsonArray videos;
+    for (const auto &s : cfg.videos) videos.append(QJsonObject{
+        {"enabled", s.enabled}, {"label", QString::fromStdString(s.label)},
+        {"sender_ip", QString::fromStdString(s.sender_ip)}, {"stream_name", QString::fromStdString(s.stream_name)}});
     QJsonArray returns;
     for (const auto &r : cfg.returns) returns.append(QJsonObject{
         {"enabled", r.enabled}, {"destination_ip", QString::fromStdString(r.destination_ip)},
@@ -94,7 +105,7 @@ bool write_config(const Config &cfg, std::string &error) {
         {"pcm_bits", r.pcm_bits}});
     const QJsonDocument doc(QJsonObject{
         {"version", 1}, {"common_ip", cfg.common_ip}, {"sender_ip", QString::fromStdString(cfg.sender_ip)},
-        {"port", cfg.port}, {"slots", slots}, {"returns", returns},
+        {"port", cfg.port}, {"slots", slots}, {"returns", returns}, {"videos", videos},
         {"return_local_ip", QString::fromStdString(cfg.return_local_ip)}, {"return_buffer_ms", int(cfg.return_buffer_ms)}});
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly)) { error = file.errorString().toStdString(); return false; }
@@ -127,15 +138,36 @@ std::string status_text(const Receiver &receiver, int index) {
 class SettingsDialog final : public QDialog {
 public:
     SettingsDialog(QWidget *parent, std::shared_ptr<Receiver> receiver, Config initial,
-                   std::shared_ptr<MonitorReturn> returns, std::function<bool(const Config &, std::string &)> apply)
-        : QDialog(parent), receiver_(std::move(receiver)), returns_(std::move(returns)), apply_(std::move(apply)) {
+                   std::shared_ptr<MonitorReturn> returns, std::shared_ptr<VideoReceiver> video, std::function<bool(const Config &, std::string &)> apply)
+        : QDialog(parent), receiver_(std::move(receiver)), returns_(std::move(returns)), video_(std::move(video)), apply_(std::move(apply)) {
         setWindowTitle("VBAN Stream Settings");
+        // Scope the dark appearance to this dialog; never change OBS's application palette.
+        setStyleSheet(R"(
+            QWidget { background-color: #101114; color: #eceef2; }
+            QTabWidget::pane { border: 1px solid #363940; }
+            QTabBar::tab { background: #1b1e24; border: 1px solid #363940; padding: 7px 14px; }
+            QTabBar::tab:selected { background: #101114; border-bottom-color: #101114; color: #72c8f0; }
+            QGroupBox { border: 1px solid #363940; border-radius: 5px; margin-top: 12px; padding-top: 8px; }
+            QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; color: #72c8f0; }
+            QLineEdit, QSpinBox, QComboBox { background: #08090b; border: 1px solid #41454e; border-radius: 3px; padding: 3px; selection-background-color: #246d91; }
+            QLineEdit:focus, QSpinBox:focus, QComboBox:focus { border-color: #72c8f0; }
+            QComboBox QAbstractItemView { background: #111318; color: #eceef2; selection-background-color: #246d91; }
+            QPushButton { background: #262b33; border: 1px solid #4c5360; border-radius: 4px; padding: 6px 14px; }
+            QPushButton:hover { background: #343d49; border-color: #72c8f0; }
+            QPushButton:pressed { background: #1a435a; }
+            QWidget:disabled { color: #777d88; }
+            QToolTip { background: #20252c; color: #eceef2; border: 1px solid #4c5360; }
+        )");
         char *icon = obs_module_file("vban-audio.png");
         if (icon) { setWindowIcon(QIcon(QString::fromUtf8(icon))); bfree(icon); }
         setAttribute(Qt::WA_DeleteOnClose);
         setMinimumWidth(900);
-        auto *layout = new QVBoxLayout(this);
-        common_ = new QCheckBox("Use one sender IP for all streams", this);
+        auto *outer = new QVBoxLayout(this);
+        auto *tabs = new QTabWidget(this); tabs->setObjectName("vban_tabs"); outer->addWidget(tabs);
+        auto *audio_page = new QWidget(tabs);
+        auto *layout = new QVBoxLayout(audio_page);
+        tabs->addTab(audio_page, "Audio and returns");
+        common_ = new QCheckBox("Use one sender IP for all audio streams", this);
         common_->setObjectName("common_ip"); common_->setChecked(initial.common_ip);
         layout->addWidget(common_);
         auto *form = new QFormLayout;
@@ -146,6 +178,8 @@ public:
         port_ = new QSpinBox(this); port_->setRange(1,65535); port_->setValue(initial.port);
         form->addRow("UDP listen port", port_);
         layout->addLayout(form);
+        auto *port_help = new QLabel("The UDP listen port is shared by audio and video inputs.", this);
+        layout->addWidget(port_help);
         auto *grid = new QGridLayout;
         const char *headers[]{"Slot", "Enabled", "Friendly name", "VBAN stream name", "Sender IPv4", "Live status", "Channels", "Input format"};
         for (int c = 0; c < 8; ++c) grid->addWidget(new QLabel(headers[c], this), 0, c);
@@ -265,8 +299,40 @@ public:
             "Do not route the returns back into the VBAN feeds entering OBS.", returns_box);
         return_help->setWordWrap(true); returns_grid->addWidget(return_help, 3, 0, 1, 7);
         layout->addWidget(returns_box);
+        auto *video_page = new QWidget(tabs);
+        auto *video_layout = new QVBoxLayout(video_page);
+        tabs->addTab(video_page, "Video inputs");
+        auto *video_help = new QLabel("Receive two VBAN-Frame streams from VoiceMeeter, Matrix or another compatible sender. "
+            "Choose App View or a display and JPEG/PNG on the sender. Send to this PC using the UDP listen port on the Audio and returns tab. "
+            "After Apply, add a VBAN Video source and select one of these inputs.", video_page);
+        video_help->setWordWrap(true); video_layout->addWidget(video_help);
+        for (size_t i = 0; i < video_slot_count; ++i) {
+            const auto &s = initial.videos[i];
+            auto *box = new QGroupBox(QString("VIDEO %1").arg(i+1), video_page);
+            auto *fields = new QFormLayout(box);
+            const auto prefix = QString("video_%1_").arg(i);
+            video_enabled_[i] = new QCheckBox("Receive this video", box);
+            video_enabled_[i]->setObjectName(prefix + "enabled"); video_enabled_[i]->setChecked(s.enabled);
+            video_labels_[i] = new QLineEdit(QString::fromStdString(s.label), box);
+            video_labels_[i]->setObjectName(prefix + "label"); video_labels_[i]->setMaxLength(64);
+            video_ips_[i] = new QLineEdit(QString::fromStdString(s.sender_ip), box);
+            video_ips_[i]->setObjectName(prefix + "ip"); video_ips_[i]->setMaxLength(15);
+            video_ips_[i]->setPlaceholderText("192.168.1.11");
+            video_names_[i] = new QLineEdit(QString::fromStdString(s.stream_name), box);
+            video_names_[i]->setObjectName(prefix + "name"); video_names_[i]->setMaxLength(16);
+            video_names_[i]->setPlaceholderText("VIDEO1");
+            video_states_[i] = new QLabel(box); video_states_[i]->setObjectName(prefix + "status");
+            video_states_[i]->setTextFormat(Qt::PlainText); video_states_[i]->setWordWrap(true);
+            fields->addRow(video_enabled_[i]); fields->addRow("Friendly name", video_labels_[i]);
+            fields->addRow("Sender IPv4", video_ips_[i]); fields->addRow("VBAN stream name", video_names_[i]);
+            fields->addRow("Live status", video_states_[i]); video_layout->addWidget(box);
+        }
+        auto *video_note = new QLabel("JPEG and PNG are detected automatically. Each input supports up to 4K. "
+            "Video reception is separate from audio; add the existing VBAN Stream audio source if needed. "
+            "This build receives video only; remote mouse control is not enabled.", video_page);
+        video_note->setWordWrap(true); video_layout->addWidget(video_note); video_layout->addStretch();
         error_ = new QLabel(this); error_->setWordWrap(true); error_->setTextFormat(Qt::PlainText);
-        layout->addWidget(error_);
+        outer->addWidget(error_);
         auto *buttons = new QDialogButtonBox(QDialogButtonBox::Cancel | QDialogButtonBox::Apply | QDialogButtonBox::Ok, this);
         auto *donate = buttons->addButton("Donate on Ko-fi", QDialogButtonBox::ActionRole);
         donate->setObjectName("donate");
@@ -274,7 +340,7 @@ public:
         connect(donate, &QPushButton::clicked, this, [] {
             QDesktopServices::openUrl(QUrl("https://ko-fi.com/msffixit"));
         });
-        layout->addWidget(buttons);
+        outer->addWidget(buttons);
         connect(common_, &QCheckBox::toggled, this, [this] { update_mode(); });
         connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
         connect(buttons, &QDialogButtonBox::accepted, this, [this] { if (this->apply()) accept(); });
@@ -290,6 +356,17 @@ private:
         for (auto *sender : senders_) sender->setEnabled(!common_->isChecked());
     }
     void refresh() {
+        for (size_t i = 0; i < video_slot_count; ++i) {
+            const auto s = video_->status(i);
+            QString text = !s.enabled ? "Disabled" : s.receiving ? "Receiving" : "Waiting";
+            if (!s.error.empty()) text += " - " + QString::fromStdString(s.error);
+            if (s.receiving) text += QString(" - %1 x %2 - %3").arg(s.width).arg(s.height).arg(QString::fromStdString(s.format));
+            video_states_[i]->setText(text);
+            video_states_[i]->setToolTip(QString("Decoded frames: %1\nIncomplete frames: %2\nInvalid packets: %3\n"
+                "Duplicate/old packets: %4\nDecode errors: %5\nQueue drops: %6")
+                .arg(s.decoded).arg(s.packets.incomplete).arg(s.packets.invalid)
+                .arg(s.packets.duplicates).arg(s.decode_errors).arg(s.queue_drops));
+        }
         unsigned receiving = 0;
         for (size_t i = 0; i < slot_count; ++i) {
             auto s = receiver_->status(i);
@@ -347,6 +424,9 @@ private:
             return_enabled_[i]->isChecked(), return_ips_[i]->text().trimmed().toStdString(),
             static_cast<uint16_t>(return_ports_[i]->value()), return_names_[i]->text().toStdString(),
             return_formats_[i]->currentData().toInt()};
+        for (size_t i = 0; i < video_slot_count; ++i) cfg.videos[i] = {
+            video_enabled_[i]->isChecked(), video_labels_[i]->text().toStdString(),
+            video_ips_[i]->text().trimmed().toStdString(), video_names_[i]->text().toStdString()};
         std::string error;
         try {
             if (!apply_(cfg, error)) {
@@ -358,6 +438,10 @@ private:
     }
     std::shared_ptr<Receiver> receiver_;
     std::shared_ptr<MonitorReturn> returns_;
+    std::shared_ptr<VideoReceiver> video_;
+    std::array<QCheckBox *, video_slot_count> video_enabled_{};
+    std::array<QLineEdit *, video_slot_count> video_labels_{}, video_names_{}, video_ips_{};
+    std::array<QLabel *, video_slot_count> video_states_{};
     std::function<bool(const Config &, std::string &)> apply_;
     QCheckBox *common_{};
     QLineEdit *ip_{};
@@ -374,8 +458,8 @@ private:
     QComboBox *return_local_{};
 };
 QDialog *make_settings_dialog(QWidget *parent, std::shared_ptr<Receiver> receiver,
-                             Config initial, std::shared_ptr<MonitorReturn> returns,
+                             Config initial, std::shared_ptr<MonitorReturn> returns, std::shared_ptr<VideoReceiver> video,
                              std::function<bool(const Config &, std::string &)> apply) {
-    return new SettingsDialog(parent, std::move(receiver), std::move(initial), std::move(returns), std::move(apply));
+    return new SettingsDialog(parent, std::move(receiver), std::move(initial), std::move(returns), std::move(video), std::move(apply));
 }
 }
