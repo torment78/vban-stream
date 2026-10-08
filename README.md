@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/social-preview.jpg" width="100%" alt="VBAN Stream by ElkaSoft for OBS Studio">
+  <img src="docs/images/wide-tagged-0.3.5.jpg" width="100%" alt="VBAN Stream by ElkaSoft for OBS Studio">
 </p>
 
 # VBAN Stream
@@ -18,7 +18,7 @@ VBAN-Frame receiver. Windows x64 and universal Mac test installers are available
 [**Windows installer — stable 0.2.2**](https://github.com/torment78/vban-stream/releases/download/v0.2.2/obs-vban-audio-0.2.2-windows-x64-setup.exe)
  · [Windows installer — development 0.3.5](https://github.com/torment78/vban-stream/releases/download/v0.3.5/vban-stream-0.3.5-windows-x64-setup.exe)
  · [Mac installer — development 0.3.5](https://github.com/torment78/vban-stream/releases/download/v0.3.5/vban-stream-0.3.5-macos-universal-test.pkg)
- · [Download all banners](https://github.com/torment78/vban-stream/releases/download/v0.2.5/VBAN-Stream-artwork.zip)
+ · [Download all banners](https://github.com/torment78/vban-stream/releases/download/v0.3.5/VBAN-Stream-artwork-0.3.5.zip)
  · [Installation guide](https://github.com/torment78/vban-stream/releases/download/v0.3.5/VBAN-INSTALL.txt)
  · [Report an issue](https://github.com/torment78/vban-stream/issues)
 
