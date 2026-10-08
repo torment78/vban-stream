@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/social-preview.jpg" width="100%" alt="VBAN Stream by ElkaSoft for OBS Studio">
+  <img src="docs/images/wide-tagged-0.3.5.jpg" width="100%" alt="VBAN Stream by ElkaSoft for OBS Studio">
 </p>
 
 # VBAN Stream
@@ -10,14 +10,16 @@ An independent plugin by **ElkaSoft** for OBS Studio.
 
 Receive named VBAN streams with 1–8 channels each directly in OBS. Send the OBS monitoring mix back to
 two computers, each with its own destination address, UDP port, and stream name.
-The 0.3.0 pre-release also receives two VBAN-Frame video feeds, such as a
-VoiceMeeter App View or a remote display, on Windows x64 and macOS.
+The 0.3.5 development release receives two VBAN-Frame video feeds, such as a
+VoiceMeeter App View or a remote display, and adds Ctrl-click mouse return from
+OBS Program in Studio Mode. It also sends the live Program picture to a
+VBAN-Frame receiver. Windows x64 and universal Mac test installers are available.
 
 [**Windows installer — stable 0.2.2**](https://github.com/torment78/vban-stream/releases/download/v0.2.2/obs-vban-audio-0.2.2-windows-x64-setup.exe)
- · [Windows installer — development 0.3.0](https://github.com/torment78/vban-stream/releases/download/v0.3.0/vban-stream-0.3.0-windows-x64-setup.exe)
- · [Mac installer — development 0.3.0](https://github.com/torment78/vban-stream/releases/download/v0.3.0/vban-stream-0.3.0-macos-universal-test.pkg)
- · [Download all banners](https://github.com/torment78/vban-stream/releases/download/v0.2.5/VBAN-Stream-artwork.zip)
- · [Installation guide](https://github.com/torment78/vban-stream/releases/download/v0.3.0/VBAN-INSTALL.txt)
+ · [Windows installer — development 0.3.5](https://github.com/torment78/vban-stream/releases/download/v0.3.5/vban-stream-0.3.5-windows-x64-setup.exe)
+ · [Mac installer — development 0.3.5](https://github.com/torment78/vban-stream/releases/download/v0.3.5/vban-stream-0.3.5-macos-universal-test.pkg)
+ · [Download all banners](https://github.com/torment78/vban-stream/releases/download/v0.3.5/VBAN-Stream-artwork-0.3.5.zip)
+ · [Installation guide](https://github.com/torment78/vban-stream/releases/download/v0.3.5/VBAN-INSTALL.txt)
  · [Report an issue](https://github.com/torment78/vban-stream/issues)
 
 [![Donate on Ko-fi](https://img.shields.io/badge/Donate-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/msffixit)
@@ -28,34 +30,34 @@ Free and open source under GPL-2.0-or-later. Donations support development and a
 
 ## Download and install
 
-Windows and Mac development builds are **0.3.0**. The latest stable version is **0.2.2** and retains the earlier VBAN Audio name. Tested with **OBS 31.1.1** and **OBS 32.2.1** on Windows x64.
+The Windows and Mac development builds are **0.3.5**. The latest stable version is **0.2.2** and retains the earlier VBAN Audio name. Tested with **OBS 31.1.1** and **OBS 32.2.1** on Windows x64.
 
 Use the setup installer for both stable and development builds.
 
 | Installer | Version and platform |
 | --- | --- |
 | [Windows stable setup](https://github.com/torment78/vban-stream/releases/download/v0.2.2/obs-vban-audio-0.2.2-windows-x64-setup.exe) | 0.2.2, Windows x64, standard or portable OBS |
-| [Windows development setup](https://github.com/torment78/vban-stream/releases/download/v0.3.0/vban-stream-0.3.0-windows-x64-setup.exe) | 0.3.0 pre-release, Windows x64, standard or portable OBS |
-| [Mac development installer](https://github.com/torment78/vban-stream/releases/download/v0.3.0/vban-stream-0.3.0-macos-universal-test.pkg) | 0.3.0 pre-release, Apple Silicon and Intel |
+| [Windows development setup](https://github.com/torment78/vban-stream/releases/download/v0.3.5/vban-stream-0.3.5-windows-x64-setup.exe) | 0.3.5 pre-release, Windows x64, standard or portable OBS |
+| [Mac development installer](https://github.com/torment78/vban-stream/releases/download/v0.3.5/vban-stream-0.3.5-macos-universal-test.pkg) | 0.3.5 pre-release, Apple Silicon and Intel |
 
 Source code and optional manual packages are available separately on GitHub.
 
 ### macOS test build
 
-The [0.3.0 pre-release](https://github.com/torment78/vban-stream/releases/tag/v0.3.0)
+The [0.3.5 Mac pre-release](https://github.com/torment78/vban-stream/releases/tag/v0.3.5)
 is for testing on **macOS 13 or later**, with **OBS Studio 31.1.1 or later**.
 The universal `.plugin` bundle contains both Apple Silicon and Intel code.
 
-Use the [Mac setup installer](https://github.com/torment78/vban-stream/releases/download/v0.3.0/vban-stream-0.3.0-macos-universal-test.pkg). It installs into
+Use the [Mac setup installer](https://github.com/torment78/vban-stream/releases/download/v0.3.5/vban-stream-0.3.5-macos-universal-test.pkg). It installs into
 `~/Library/Application Support/obs-studio/plugins`. Quit OBS before installation.
 These test builds use ad-hoc signing and are not Apple notarized; the
-[Mac installation and testing guide](https://github.com/torment78/vban-stream/releases/download/v0.3.0/INSTALL-MAC.txt) explains approval and
+[Mac installation and testing guide](https://github.com/torment78/vban-stream/releases/download/v0.3.5/INSTALL-MAC.txt) explains approval and
 includes a listening checklist. Sustained audio and real OBS GUI testing are still
 required before promoting Mac support to a stable release.
 
 ### Using the Windows installer
 
-1. Close OBS, run **vban-stream-0.3.0-windows-x64-setup.exe**, and approve the Windows administrator prompt.
+1. Close OBS, run **vban-stream-0.3.5-windows-x64-setup.exe**, and approve the Windows administrator prompt.
 2. Choose **Standard OBS installation** (selected by default) or **Portable OBS**.
 3. Check the detected standard OBS folder, or click **Browse** to choose your portable
    OBS root: the folder containing **bin**, **data**, and **obs-plugins**.
@@ -140,12 +142,88 @@ pixel count in portrait orientation. Before reception, a source shows a black
 its last dimensions, then recovers automatically when reception resumes.
 
 Each video source is video-only. Add **VBAN Stream** for accompanying audio.
-**Remote mouse control is not included** in this development build.
+Each input has a **Mouse control** card for optional VoiceMeeter App View control.
 
 Hover over a video's status for incomplete frames, decode errors and queue drops.
 If these rise steadily, reduce the sender's frame rate/resolution, try JPEG, and
 check the LAN. Incomplete images are dropped without displaying partial pictures.
 [Protocol and testing details](https://github.com/torment78/vban-stream/blob/dev/docs/VIDEO-RECEIVE.md).
+
+## Control VoiceMeeter from Program
+
+1. Receive the sender's **App View** through a VBAN Video source and place it in your Program scene.
+2. On that computer, enable an incoming **VBAN-TEXT** stream. Use the OBS computer's
+   sender IP, choose a command stream name (for example **Command1**), and enable
+   **Manage Mouse command** from the stream's format/sample-rate context menu.
+3. Open **Tools → VBAN Stream Settings → Video inputs**. Under the matching
+   video, enable **Mouse control for Video 1** or **Mouse control for Video 2**, enter that computer's destination IP, its VBAN UDP
+   listen port, and the exact incoming command stream name. Click **Apply**.
+4. Turn on **Studio Mode**. Hold **Ctrl** and left-click, right-click or drag inside
+   the live App View in the **Program** pane. On Mac, use the physical **Control** key.
+   The Preview pane remains available for arranging the scene.
+
+Each video has its own mouse destination. The command stream name is separate
+from the video stream name. Use **Mouse control: send from this PC** to select a LAN adapter if
+automatic routing chooses the wrong one. Mouse return starts disabled.
+
+Normal scene positioning, scaling, manual cropping, rotation, groups and nested
+scenes are supported. An overlapping visible source blocks clicks through it;
+filters and **Crop to Bounding Box** disable interaction on that source. Use App
+View at its original sender size so the returned pixel coordinates match.
+
+Release Ctrl, press Esc or leave the picture to end a drag. Changing scenes,
+leaving Studio Mode, losing focus or losing the video also releases the remote
+button. Keyboard typing, the mouse wheel, projectors and fullscreen Program are
+not supported. **Sent** counts outgoing UDP packets, not confirmed reception.
+
+Mouse return is a preview feature: please test it with your VoiceMeeter version
+before using it during a live show. [Setup and implementation details](docs/MOUSE-RETURN.md).
+
+## Send OBS Program to VBAN Frame
+
+1. Open **Tools → VBAN Stream Settings → OBS to VBAN Frame**.
+2. Enable **Send OBS Program**. Enter the receiving computer's IPv4 address,
+   UDP listen port and exact incoming video stream name.
+3. Select the OBS computer's LAN adapter if needed. Start with **JPEG**, a
+   **1280 × 720** resolution limit, **15 fps**, quality limit **80** and **24 Mbps**.
+   Leave **Adapt JPEG quality to maintain frame rate** checked initially.
+4. Click **Apply**. In VBAN-Screen or another VBAN-Frame receiver, select the
+   OBS computer as sender and use the same stream name and port.
+
+This sends the live Program picture, including scene changes and transitions.
+Studio Mode is optional for sending video. It does not include the OBS interface,
+Preview pane or audio. For sound, configure a monitor return separately.
+
+The resolution limit preserves aspect ratio and never enlarges the picture.
+Adaptive JPEG lowers quality when needed to fit the selected frame rate and
+network limit; the quality setting is its maximum. Uncheck it for fixed quality.
+For lower traffic, try **12 Mbps** or **6 Mbps**, then reduce resolution or FPS if
+the picture becomes too soft. The network limit is this stream's budget, not your
+LAN's speed. Static pictures use a cached refresh roughly once a second.
+
+JPEG and PNG encoding use the CPU. PNG is lossless but much larger and slower for
+detailed moving pictures; use JPEG for motion. FPS and network settings are upper
+limits: encoding, image size and receiver performance can reduce actual frame rate.
+The sender keeps the newest queued picture so old frames do not build up.
+
+JPEG quality 100 can still produce large transfers: each changing picture is a
+complete image. Version 0.3.5 spaces individual video packets across the frame
+interval to reduce bursts at the receiver. JPEG file-size optimization retains the selected
+quality. Actual playback and error counters must be checked at the receiving app.
+**Mbps means megabits per second**: 80 Mbps is about 10 megabytes per second.
+Zero local send errors do not rule out missing packets at the receiver.
+
+Sending starts disabled. It currently requires an SDR OBS video colour space.
+Disable this output and click Apply before changing OBS video settings or profiles.
+Live status shows measured outgoing **FPS**, estimated **Mbps** including packet
+overhead, and the JPEG quality actually used. Low FPS is normal for a still picture.
+Hover over status for encode time, send time, capture-to-send age and error counters.
+These measure local work; **Sending** does not confirm remote reception or display.
+If moving pictures are slow, compare these numbers with the receiver. Lower
+resolution, FPS or fixed JPEG quality if frames are repeatedly skipped; for an
+image-budget error, use JPEG or increase the network limit if the LAN allows it.
+Avoid including the received copy in the same outgoing Program scene.
+[Protocol and testing details](docs/PROGRAM-OUTPUT.md).
 
 ## Send the monitor mix back
 
