@@ -18,6 +18,8 @@
 #include <QThread>
 #include <QWidget>
 #include <QTabWidget>
+#include <QScrollArea>
+#include <QScrollBar>
 #include <atomic>
 #include <chrono>
 #include <thread>
@@ -205,8 +207,18 @@ int main(int argc,char **argv) {
         obs_properties_destroy(video_props);
         auto *tabs=dialog->findChild<QTabWidget *>("vban_tabs");check(tabs,"Video tab exists");
         tabs->setCurrentIndex(1);app.processEvents();dialog->grab().save(root+"/video-settings-dialog.png");
-        check(tabs->count()==3,"Mouse return is the third tab");
-        tabs->setCurrentIndex(2);app.processEvents();dialog->grab().save(root+"/mouse-settings-dialog.png");
+        check(tabs->count()==3 && tabs->tabText(2)=="OBS to VBAN Frame","Mouse controls share Video inputs; third tab sends Program");
+        check(mouse_enable->parentWidget()->parentWidget()==video_enabled->parentWidget(),"Video 1 owns its mouse control card");
+        auto *mouse_second=dialog->findChild<QCheckBox *>("mouse_1_enabled");
+        check(mouse_second && mouse_second->parentWidget()->parentWidget()==video_second->parentWidget(),"Video 2 owns its mouse control card");
+        auto *video_scroll=dialog->findChild<QScrollArea *>("video_settings_scroll");
+        check(video_scroll,"Video and mouse setup can scroll on smaller screens");
+        video_scroll->verticalScrollBar()->setValue(video_scroll->verticalScrollBar()->maximum());
+        app.processEvents();dialog->grab().save(root+"/mouse-settings-dialog.png");
+        tabs->setCurrentIndex(2);app.processEvents();dialog->grab().save(root+"/program-output-settings-dialog.png");
+        auto *output_enabled=dialog->findChild<QCheckBox *>("frame_output_enabled");
+        check(output_enabled && !output_enabled->isChecked(),"Program output is disabled for old settings");
+        check(!saved.value("frame_output").toObject().value("enabled").toBool(),"Disabled Program output persists safely");
         tabs->setCurrentIndex(0);obs_source_release(video_source);
         const int before=a.count;
         send("CHANGED",600,2,2);

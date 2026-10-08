@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Full path: UDP -> distributed DLL -> JPEG/PNG decoder -> OBS D3D11 -> raw output pixels.
 #include "socket-platform.hpp"
+#include "frame-protocol.hpp"
 #include <obs.h>
 #include <QApplication>
 #include <QAction>
@@ -65,7 +66,19 @@ int main(int argc,char **argv){
     auto *frontend=new TestFrontend(window);frontend->studio_mode=true;obs_frontend_set_callbacks_internal(frontend);
     const QString config=QString::fromLocal8Bit(argv[3]);QDir().mkpath(config+"/obs-vban-audio");
     check(vban::net::startup()==0,"Sockets");
-    MouseListener mouse[2];
+    MouseListener mouse[2], outgoing;
+    vban::net::receive_buffer(outgoing.socket);
+    vban::FrameAssembler program_frames;int sent_red=0,sent_blue=0;
+    auto receive_program=[&]{
+        while(vban::net::readable(outgoing.socket,0)>0){
+            std::array<uint8_t,1465> bytes{};const int n=recv(outgoing.socket,reinterpret_cast<char*>(bytes.data()),int(bytes.size()),0);
+            check(n>28&&n<=1464&&!std::memcmp(bytes.data()+8,"OBS-PROGRAM",11),"Program wire name and datagram length");
+            const auto now=uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
+            auto complete=program_frames.push(bytes.data(),size_t(n),now);
+            if(complete){const auto decoded=QImage::fromData(complete->data(),int(complete->size()));check(decoded.size()==QSize(320,180),"Outgoing Program dimensions");
+                const auto pixel=decoded.pixelColor(160,90);if(pixel.red()>220&&pixel.blue()<25)++sent_red;if(pixel.blue()>220&&pixel.red()<25)++sent_blue;}
+        }
+    };
     QJsonArray mice;for(int i=0;i<2;++i)mice.append(QJsonObject{{"enabled",true},{"destination_ip","127.0.0.1"},{"port",mouse[i].port},{"stream_name",QString("Command%1").arg(i+1)}});
     auto sender=::socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
     auto reserve=::socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
@@ -74,7 +87,7 @@ int main(int argc,char **argv){
     vban::net::Length length=sizeof(dest);getsockname(reserve,reinterpret_cast<sockaddr*>(&dest),&length);vban::net::close(reserve);
     QJsonArray videos;for(int i=0;i<2;++i)videos.append(QJsonObject{{"enabled",true},{"label",QString("Video %1").arg(i+1)},{"sender_ip","127.0.0.1"},{"stream_name",QString("VIDEO%1").arg(i+1)}});
     QFile file(config+"/obs-vban-audio/settings.json");check(file.open(QIODevice::WriteOnly),"Isolated settings");
-    file.write(QJsonDocument(QJsonObject{{"version",1},{"port",ntohs(dest.sin_port)},{"videos",videos},{"mouse_returns",mice}}).toJson());file.close();
+    file.write(QJsonDocument(QJsonObject{{"version",1},{"port",ntohs(dest.sin_port)},{"videos",videos},{"mouse_returns",mice},{"frame_output",QJsonObject{{"enabled",true},{"destination_ip","127.0.0.1"},{"port",outgoing.port},{"format","PNG"}}}}).toJson());file.close();
     check(obs_startup("en-US",config.toUtf8().constData(),nullptr),"OBS startup");
     auto *private_data=obs_get_private_data();obs_data_set_bool(private_data,"AbsoluteCoordinates",true);obs_data_release(private_data);
     const QString runtime=QString::fromLocal8Bit(argv[4]);
@@ -114,15 +127,17 @@ int main(int argc,char **argv){
     };
     auto pump=[&](int ms,bool transmit){
         const auto end=std::chrono::steady_clock::now()+std::chrono::milliseconds(ms);
-        while(std::chrono::steady_clock::now()<end){if(transmit){++frame;send(png,"VIDEO1");send(jpeg,"VIDEO2");}app.processEvents();std::this_thread::sleep_for(std::chrono::milliseconds(40));}
+        while(std::chrono::steady_clock::now()<end){if(transmit){++frame;send(png,"VIDEO1");send(jpeg,"VIDEO2");}app.processEvents();receive_program();std::this_thread::sleep_for(std::chrono::milliseconds(40));}
     };
     pump(1600,true);
     auto *props=obs_source_properties(first);
     std::cout<<"First source: "<<obs_property_description(obs_properties_get(props,"status"))<<"; size="<<obs_source_get_width(first)<<"x"<<obs_source_get_height(first)<<"; red="<<red<<" blue="<<blue<<" black="<<black<<"\n";
     obs_properties_destroy(props);
     check(red>10,"PNG visible in actual OBS video output");
+    check(sent_red>5,"Actual Program renderer is encoded and delivered over VBAN UDP");
     check(obs_source_get_width(first)==320&&obs_source_get_height(first)==180,"Native image dimensions");
     obs_set_output_source(0,second);pump(1000,true);check(blue>10,"Second JPEG stream visible in actual OBS output");
+    check(sent_blue>3,"Program sender follows the switched Program picture");
     const auto blue_before=blue.load();obs_source_update(first,second_settings);obs_set_output_source(0,first);pump(700,true);
     check(blue>blue_before+5,"Switching source selection displays the other stream");
     const auto black_before=black.load();pump(3600,false);check(black>black_before+5,"Sender timeout clears OBS picture");
@@ -168,6 +183,6 @@ int main(int argc,char **argv){
     obs_sceneitem_remove(item);obs_sceneitem_remove(item2);obs_scene_release(scene);
     obs_source_release(first);obs_source_release(second);obs_data_release(settings);obs_data_release(second_settings);obs_wait_for_destroy_queue();
     obs_shutdown();app.processEvents();obs_frontend_set_callbacks_internal(nullptr);vban::net::close(sender);vban::net::cleanup();
-    std::cout<<"PASS: two VBAN Video sources render PNG/JPEG pixels through the real OBS graphics pipeline; selection, timeout, recovery and Program-only Ctrl mouse return verified.\n";return 0;
+    std::cout<<"PASS: two VBAN Video sources render PNG/JPEG pixels through the real OBS graphics pipeline; selection, timeout, recovery, Program-only Ctrl mouse return and live Program-to-VBAN output verified.\n";return 0;
  }catch(const std::exception &e){std::cerr<<"OBS video check failed: "<<e.what()<<"\n";return 1;}
 }

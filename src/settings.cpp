@@ -23,6 +23,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSaveFile>
+#include <QScrollArea>
 #include <QSpinBox>
 #include <QTabWidget>
 #include <QTimer>
@@ -67,6 +68,15 @@ Config read_config(std::string &error) {
         cfg.videos[i] = {item.value("enabled").toBool(), item.value("label").toString().toStdString(),
             item.value("sender_ip").toString().toStdString(), item.value("stream_name").toString().toStdString()};
     }
+    const auto out = root.value("frame_output").toObject();
+    auto &o = cfg.frame_output; o.enabled = out.value("enabled").toBool(false);
+    o.destination_ip = out.value("destination_ip").toString().toStdString();
+    o.local_ip = out.value("local_ip").toString().toStdString();
+    o.stream_name = out.value("stream_name").toString("OBS-PROGRAM").toStdString();
+    o.format = out.value("format").toString("JPEG").toStdString();
+    const int output_port = out.value("port").toInt(6980); o.port = uint16_t(output_port > 0 && output_port <= 65535 ? output_port : 0);
+    o.max_width = out.value("max_width").toInt(1280); o.max_height = out.value("max_height").toInt(720);
+    o.fps = out.value("fps").toInt(15); o.quality = out.value("quality").toInt(80); o.mbps = out.value("mbps").toInt(24);
     cfg.mouse_local_ip = root.value("mouse_local_ip").toString().toStdString();
     const auto mice = root.value("mouse_returns").toArray();
     for (int i = 0; i < std::min(mice.size(), qsizetype(video_slot_count)); ++i) {
@@ -115,9 +125,15 @@ bool write_config(const Config &cfg, std::string &error) {
         {"enabled", r.enabled}, {"destination_ip", QString::fromStdString(r.destination_ip)},
         {"destination_port", r.destination_port}, {"stream_name", QString::fromStdString(r.stream_name)},
         {"pcm_bits", r.pcm_bits}});
+    const auto &o = cfg.frame_output;
+    const QJsonObject output{{"enabled",o.enabled},{"destination_ip",QString::fromStdString(o.destination_ip)},
+        {"local_ip",QString::fromStdString(o.local_ip)},{"port",o.port},{"stream_name",QString::fromStdString(o.stream_name)},
+        {"format",QString::fromStdString(o.format)},{"max_width",o.max_width},{"max_height",o.max_height},
+        {"fps",o.fps},{"quality",o.quality},{"mbps",o.mbps}};
     const QJsonDocument doc(QJsonObject{
         {"version", 1}, {"common_ip", cfg.common_ip}, {"sender_ip", QString::fromStdString(cfg.sender_ip)},
         {"port", cfg.port}, {"slots", slots}, {"returns", returns}, {"videos", videos},
+        {"frame_output",output},
         {"mouse_returns", mice}, {"mouse_local_ip", QString::fromStdString(cfg.mouse_local_ip)},
         {"return_local_ip", QString::fromStdString(cfg.return_local_ip)}, {"return_buffer_ms", int(cfg.return_buffer_ms)}});
     QSaveFile file(path);
@@ -151,8 +167,8 @@ std::string status_text(const Receiver &receiver, int index) {
 class SettingsDialog final : public QDialog {
 public:
     SettingsDialog(QWidget *parent, std::shared_ptr<Receiver> receiver, Config initial,
-                   std::shared_ptr<MonitorReturn> returns, std::shared_ptr<VideoReceiver> video, std::shared_ptr<MouseReturn> mouse, ProgramMouse *control, std::function<bool(const Config &, std::string &)> apply)
-        : QDialog(parent), receiver_(std::move(receiver)), returns_(std::move(returns)), video_(std::move(video)), mouse_(std::move(mouse)), control_(control), apply_(std::move(apply)) {
+                   std::shared_ptr<MonitorReturn> returns, std::shared_ptr<VideoReceiver> video, std::shared_ptr<MouseReturn> mouse, ProgramMouse *control, std::shared_ptr<ProgramOutput> output, std::function<bool(const Config &, std::string &)> apply)
+        : QDialog(parent), receiver_(std::move(receiver)), returns_(std::move(returns)), video_(std::move(video)), mouse_(std::move(mouse)), control_(control), output_(std::move(output)), apply_(std::move(apply)) {
         setWindowTitle("VBAN Stream Settings");
         // Scope the dark appearance to this dialog; never change OBS's application palette.
         setStyleSheet(R"(
@@ -312,17 +328,34 @@ public:
             "Do not route the returns back into the VBAN feeds entering OBS.", returns_box);
         return_help->setWordWrap(true); returns_grid->addWidget(return_help, 3, 0, 1, 7);
         layout->addWidget(returns_box);
-        auto *video_page = new QWidget(tabs);
+        auto *video_scroll = new QScrollArea(tabs);
+        video_scroll->setObjectName("video_settings_scroll");
+        video_scroll->setWidgetResizable(true); video_scroll->setFrameShape(QFrame::NoFrame);
+        auto *video_page = new QWidget(video_scroll);
         auto *video_layout = new QVBoxLayout(video_page);
-        tabs->addTab(video_page, "Video inputs");
+        video_scroll->setWidget(video_page); tabs->addTab(video_scroll, "Video inputs");
         auto *video_help = new QLabel("Receive two VBAN-Frame streams from VoiceMeeter, Matrix or another compatible sender. "
             "Choose App View or a display and JPEG/PNG on the sender. Send to this PC using the UDP listen port on the Audio and returns tab. "
             "After Apply, add a VBAN Video source and select one of these inputs.", video_page);
         video_help->setWordWrap(true); video_layout->addWidget(video_help);
+        auto *mouse_network = new QFormLayout;
+        mouse_local_ = new QComboBox(video_page); mouse_local_->setObjectName("mouse_local_ip");
+        mouse_local_->addItem("Automatic (system route)", QString());
+        std::string mouse_adapter_error;
+        for (const auto &a : local_ipv4_addresses(mouse_adapter_error))
+            mouse_local_->addItem(QString::fromStdString(a.address + " - " + a.adapter_name), QString::fromStdString(a.address));
+        if (!initial.mouse_local_ip.empty()) {
+            auto n = mouse_local_->findData(QString::fromStdString(initial.mouse_local_ip));
+            if (n < 0) { mouse_local_->addItem(QString::fromStdString(initial.mouse_local_ip + " (unavailable)"), QString::fromStdString(initial.mouse_local_ip)); n = mouse_local_->count()-1; }
+            mouse_local_->setCurrentIndex(n);
+        }
+        mouse_network->addRow("Mouse control: send from this PC", mouse_local_); video_layout->addLayout(mouse_network);
         for (size_t i = 0; i < video_slot_count; ++i) {
             const auto &s = initial.videos[i];
             auto *box = new QGroupBox(QString("VIDEO %1").arg(i+1), video_page);
-            auto *fields = new QFormLayout(box);
+            auto *card = new QVBoxLayout(box);
+            auto *fields = new QFormLayout;
+            card->addLayout(fields);
             const auto prefix = QString("video_%1_").arg(i);
             video_enabled_[i] = new QCheckBox("Receive this video", box);
             video_enabled_[i]->setObjectName(prefix + "enabled"); video_enabled_[i]->setChecked(s.enabled);
@@ -338,55 +371,75 @@ public:
             video_states_[i]->setTextFormat(Qt::PlainText); video_states_[i]->setWordWrap(true);
             fields->addRow(video_enabled_[i]); fields->addRow("Friendly name", video_labels_[i]);
             fields->addRow("Sender IPv4", video_ips_[i]); fields->addRow("VBAN stream name", video_names_[i]);
-            fields->addRow("Live status", video_states_[i]); video_layout->addWidget(box);
-        }
-        auto *video_note = new QLabel("JPEG and PNG are detected automatically. Each input supports up to 4K. "
-            "Video reception is separate from audio; add the existing VBAN Stream audio source if needed. "
-            "To control the sender, configure the Mouse return tab.", video_page);
-        video_note->setWordWrap(true); video_layout->addWidget(video_note); video_layout->addStretch();
-        auto *mouse_page = new QWidget(tabs);
-        auto *mouse_layout = new QVBoxLayout(mouse_page);
-        tabs->addTab(mouse_page, "Mouse return");
-        auto *mouse_help = new QLabel("Control VoiceMeeter's App View from the Program picture in OBS Studio Mode. "
-            "Hold Ctrl while clicking or dragging with the left or right mouse button. Preview remains the scene editor. "
-            "On the destination, enable the matching incoming VBAN-TEXT stream and Manage Mouse command.", mouse_page);
-        mouse_help->setWordWrap(true); mouse_layout->addWidget(mouse_help);
-        auto *mouse_network = new QFormLayout;
-        mouse_local_ = new QComboBox(mouse_page); mouse_local_->setObjectName("mouse_local_ip");
-        mouse_local_->addItem("Automatic (system route)", QString());
-        std::string mouse_adapter_error;
-        for (const auto &a : local_ipv4_addresses(mouse_adapter_error))
-            mouse_local_->addItem(QString::fromStdString(a.address + " - " + a.adapter_name), QString::fromStdString(a.address));
-        if (!initial.mouse_local_ip.empty()) {
-            auto n = mouse_local_->findData(QString::fromStdString(initial.mouse_local_ip));
-            if (n < 0) { mouse_local_->addItem(QString::fromStdString(initial.mouse_local_ip + " (unavailable)"), QString::fromStdString(initial.mouse_local_ip)); n = mouse_local_->count()-1; }
-            mouse_local_->setCurrentIndex(n);
-        }
-        mouse_network->addRow("Send from this PC", mouse_local_); mouse_layout->addLayout(mouse_network);
-        for (size_t i = 0; i < video_slot_count; ++i) {
+            fields->addRow("Live status", video_states_[i]);
             const auto &m = initial.mice[i];
-            auto *box = new QGroupBox(QString("MOUSE RETURN FOR VIDEO %1").arg(i+1), mouse_page);
-            auto *fields = new QFormLayout(box); const auto prefix = QString("mouse_%1_").arg(i);
-            mouse_enabled_[i] = new QCheckBox("Enable mouse return", box);
-            mouse_enabled_[i]->setObjectName(prefix+"enabled"); mouse_enabled_[i]->setChecked(m.enabled);
-            mouse_ips_[i] = new QLineEdit(QString::fromStdString(m.destination_ip), box);
-            mouse_ips_[i]->setObjectName(prefix+"ip"); mouse_ips_[i]->setMaxLength(15);
+            auto *mouse_box = new QGroupBox(QString("Mouse control for Video %1").arg(i+1), box);
+            auto *mouse_fields = new QFormLayout(mouse_box); const auto mouse_prefix = QString("mouse_%1_").arg(i);
+            mouse_enabled_[i] = new QCheckBox("Enable mouse control", mouse_box);
+            mouse_enabled_[i]->setObjectName(mouse_prefix+"enabled"); mouse_enabled_[i]->setChecked(m.enabled);
+            mouse_ips_[i] = new QLineEdit(QString::fromStdString(m.destination_ip), mouse_box);
+            mouse_ips_[i]->setObjectName(mouse_prefix+"ip"); mouse_ips_[i]->setMaxLength(15);
             mouse_ips_[i]->setPlaceholderText("IP of the computer sending this video");
-            mouse_ports_[i] = new QSpinBox(box); mouse_ports_[i]->setObjectName(prefix+"port");
+            mouse_ports_[i] = new QSpinBox(mouse_box); mouse_ports_[i]->setObjectName(mouse_prefix+"port");
             mouse_ports_[i]->setRange(1,65535); mouse_ports_[i]->setValue(m.port ? m.port : 6980);
-            mouse_names_[i] = new QLineEdit(QString::fromStdString(m.stream_name), box);
-            mouse_names_[i]->setObjectName(prefix+"name"); mouse_names_[i]->setMaxLength(16);
-            mouse_states_[i] = new QLabel(box); mouse_states_[i]->setObjectName(prefix+"status");
+            mouse_names_[i] = new QLineEdit(QString::fromStdString(m.stream_name), mouse_box);
+            mouse_names_[i]->setObjectName(mouse_prefix+"name"); mouse_names_[i]->setMaxLength(16);
+            mouse_states_[i] = new QLabel(mouse_box); mouse_states_[i]->setObjectName(mouse_prefix+"status");
             mouse_states_[i]->setTextFormat(Qt::PlainText); mouse_states_[i]->setWordWrap(true);
-            fields->addRow(mouse_enabled_[i]); fields->addRow("Destination IPv4", mouse_ips_[i]);
-            fields->addRow("UDP port", mouse_ports_[i]); fields->addRow("VBAN-TEXT stream name", mouse_names_[i]);
-            fields->addRow("Status", mouse_states_[i]); mouse_layout->addWidget(box);
+            mouse_fields->addRow(mouse_enabled_[i]); mouse_fields->addRow("Destination IPv4", mouse_ips_[i]);
+            mouse_fields->addRow("UDP port", mouse_ports_[i]); mouse_fields->addRow("VBAN-TEXT stream name", mouse_names_[i]);
+            mouse_fields->addRow("Status", mouse_states_[i]); card->addWidget(mouse_box);
+            video_layout->addWidget(box);
         }
-        mouse_hint_ = new QLabel(mouse_page); mouse_hint_->setWordWrap(true); mouse_layout->addWidget(mouse_hint_);
-        auto *mouse_note = new QLabel("Mouse return uses original image coordinates, including ordinary scene cropping, scaling and rotation. "
-            "Filtered sources and Crop to Bounding Box are not interactive. Control stops on video loss, scene changes or released Ctrl. "
-            "Keyboard typing and mouse wheel are not forwarded.", mouse_page);
-        mouse_note->setWordWrap(true); mouse_layout->addWidget(mouse_note); mouse_layout->addStretch();
+        mouse_hint_ = new QLabel(video_page); mouse_hint_->setWordWrap(true); video_layout->addWidget(mouse_hint_);
+        auto *mouse_help = new QLabel("Each mouse card controls the App View received by the video directly above it. "
+            "On that sender, enable the matching incoming VBAN-TEXT stream and Manage Mouse command. "
+            "In OBS Studio Mode, hold Ctrl while left/right-clicking or dragging in Program; Preview remains the scene editor.", video_page);
+        mouse_help->setWordWrap(true); video_layout->addWidget(mouse_help);
+        auto *video_note = new QLabel("JPEG/PNG and up to 4K are detected automatically; add a VBAN Stream source for audio. "
+            "Mouse control supports ordinary scene cropping, scaling and rotation. Filtered sources and Crop to Bounding Box are not interactive. "
+            "Control stops on video loss, scene changes or released Ctrl. Keyboard typing and mouse wheel are not forwarded.", video_page);
+        video_note->setWordWrap(true); video_layout->addWidget(video_note); video_layout->addStretch();
+        auto *output_page = new QWidget(tabs);auto *output_layout = new QVBoxLayout(output_page);
+        tabs->addTab(output_page, "OBS to VBAN Frame");
+        auto *output_help = new QLabel("Send the OBS Program picture to VBAN-Screen or another VBAN-Frame receiver. "
+            "This follows your live Program scene, including scene switches and transitions, without the OBS controls. "
+            "In Studio Mode, editing Preview does not change the outgoing picture until you transition it to Program.", output_page);
+        output_help->setWordWrap(true); output_layout->addWidget(output_help);
+        const auto &o = initial.frame_output;
+        auto *output_box = new QGroupBox("PROGRAM VIDEO OUTPUT", output_page);auto *output_fields = new QFormLayout(output_box);
+        output_enabled_ = new QCheckBox("Send OBS Program", output_box);output_enabled_->setObjectName("frame_output_enabled");output_enabled_->setChecked(o.enabled);
+        output_ips_ = new QLineEdit(QString::fromStdString(o.destination_ip),output_box);output_ips_->setObjectName("frame_output_ip");output_ips_->setMaxLength(15);output_ips_->setPlaceholderText("IP of the receiving computer");
+        output_local_ = new QComboBox(output_box);output_local_->setObjectName("frame_output_local");output_local_->addItem("Automatic (system route)",QString());
+        std::string output_adapter_error;
+        for(const auto &a:local_ipv4_addresses(output_adapter_error))output_local_->addItem(QString::fromStdString(a.address+" - "+a.adapter_name),QString::fromStdString(a.address));
+        if(!o.local_ip.empty()) { auto n=output_local_->findData(QString::fromStdString(o.local_ip));
+            if(n<0) {output_local_->addItem(QString::fromStdString(o.local_ip+" (unavailable)"),QString::fromStdString(o.local_ip));n=output_local_->count()-1;}output_local_->setCurrentIndex(n); }
+        output_port_ = new QSpinBox(output_box);output_port_->setObjectName("frame_output_port");output_port_->setRange(1,65535);output_port_->setValue(o.port?o.port:6980);
+        output_name_ = new QLineEdit(QString::fromStdString(o.stream_name),output_box);output_name_->setObjectName("frame_output_name");output_name_->setMaxLength(16);
+        output_format_ = new QComboBox(output_box);output_format_->setObjectName("frame_output_format");output_format_->addItems({"JPEG","PNG"});output_format_->setCurrentText(QString::fromStdString(o.format));
+        output_resolution_ = new QComboBox(output_box);output_resolution_->setObjectName("frame_output_resolution");
+        output_resolution_->addItem("Up to 640 x 360",640);output_resolution_->addItem("Up to 1280 x 720",1280);output_resolution_->addItem("Up to 1920 x 1080",1920);
+        const auto resolution_index=output_resolution_->findData(o.max_width);output_resolution_->setCurrentIndex(resolution_index<0?1:resolution_index);
+        output_fps_ = new QSpinBox(output_box);output_fps_->setObjectName("frame_output_fps");output_fps_->setRange(1,30);output_fps_->setSuffix(" fps");output_fps_->setValue(o.fps);
+        output_quality_ = new QSpinBox(output_box);output_quality_->setObjectName("frame_output_quality");output_quality_->setRange(1,100);output_quality_->setValue(o.quality);
+        output_limit_ = new QComboBox(output_box);output_limit_->setObjectName("frame_output_limit");
+        for(int rate:{12,24,48,84})output_limit_->addItem(QString("%1 Mbps").arg(rate),rate);
+        const auto rate_index=output_limit_->findData(o.mbps);output_limit_->setCurrentIndex(rate_index<0?1:rate_index);
+        output_status_ = new QLabel(output_box);output_status_->setObjectName("frame_output_status");output_status_->setWordWrap(true);output_status_->setTextFormat(Qt::PlainText);
+        output_fields->addRow(output_enabled_);output_fields->addRow("Send from this PC",output_local_);
+        output_fields->addRow("Destination IPv4",output_ips_);output_fields->addRow("UDP port",output_port_);output_fields->addRow("VBAN stream name",output_name_);
+        output_fields->addRow("Image format",output_format_);output_fields->addRow("Resolution limit",output_resolution_);output_fields->addRow("Maximum frame rate",output_fps_);
+        output_fields->addRow("JPEG quality",output_quality_);output_fields->addRow("Network limit",output_limit_);output_fields->addRow("Live status",output_status_);
+        output_layout->addWidget(output_box);
+        connect(output_format_,&QComboBox::currentTextChanged,this,[this](const QString &format){output_quality_->setEnabled(format=="JPEG");});
+        output_quality_->setEnabled(o.format=="JPEG");
+        auto *output_note = new QLabel("On the receiver, match this OBS computer's sender IP, the UDP port and stream name. "
+            "Start with JPEG, 1280 x 720 and 15 fps. Aspect ratio is preserved and smaller pictures are not enlarged. "
+            "PNG is lossless and can need more bandwidth. Skipped frames mean encoding or sending could not keep up; lower the resolution or frame rate. "
+            "Video only: use the audio returns separately. SDR output is supported. Disable Send OBS Program before changing OBS video settings. "
+            "Sending confirms local UDP writes, not reception on the other computer.", output_page);
+        output_note->setWordWrap(true);output_layout->addWidget(output_note);output_layout->addStretch();
         error_ = new QLabel(this); error_->setWordWrap(true); error_->setTextFormat(Qt::PlainText);
         outer->addWidget(error_);
         auto *buttons = new QDialogButtonBox(QDialogButtonBox::Cancel | QDialogButtonBox::Apply | QDialogButtonBox::Ok, this);
@@ -412,6 +465,13 @@ private:
         for (auto *sender : senders_) sender->setEnabled(!common_->isChecked());
     }
     void refresh() {
+        const auto out = output_->status();
+        QString output_text = !out.enabled ? "Disabled" : out.sending ? "Sending" : "Waiting for Program";
+        if(out.enabled) output_text += QString(" | %1 x %2 | Frames: %3 | Skipped: %4 | Errors: %5 | From: %6")
+            .arg(out.width).arg(out.height).arg(out.frames).arg(out.dropped).arg(out.errors).arg(QString::fromStdString(out.local_ip));
+        if(!out.error.empty()) output_text += " | " + QString::fromStdString(out.error);
+        output_status_->setText(output_text);
+        output_status_->setToolTip(QString("Sent packets: %1\nSent bytes: %2").arg(out.packets).arg(out.bytes));
         mouse_hint_->setText(control_ ? QString::fromStdString(control_->availability()) : "Program control is unavailable.");
         for (size_t i = 0; i < video_slot_count; ++i) {
             const auto s = mouse_->status(i);
@@ -476,6 +536,11 @@ private:
     }
     bool apply() {
         Config cfg;
+        auto &o = cfg.frame_output;o.enabled=output_enabled_->isChecked();o.destination_ip=output_ips_->text().trimmed().toStdString();
+        o.local_ip=output_local_->currentData().toString().toStdString();o.port=static_cast<uint16_t>(output_port_->value());
+        o.stream_name=output_name_->text().toStdString();o.format=output_format_->currentText().toStdString();
+        o.max_width=output_resolution_->currentData().toInt();o.max_height=o.max_width*9/16;
+        o.fps=output_fps_->value();o.quality=output_quality_->value();o.mbps=output_limit_->currentData().toInt();
         cfg.mouse_local_ip = mouse_local_->currentData().toString().toStdString();
         for (size_t i = 0; i < video_slot_count; ++i) cfg.mice[i] = {
             mouse_enabled_[i]->isChecked(), mouse_ips_[i]->text().trimmed().toStdString(),
@@ -509,6 +574,12 @@ private:
     std::shared_ptr<VideoReceiver> video_;
     std::shared_ptr<MouseReturn> mouse_;
     ProgramMouse *control_ = nullptr;
+    std::shared_ptr<ProgramOutput> output_;
+    QCheckBox *output_enabled_{};
+    QLineEdit *output_ips_{}, *output_name_{};
+    QComboBox *output_local_{}, *output_format_{}, *output_resolution_{}, *output_limit_{};
+    QSpinBox *output_port_{}, *output_fps_{}, *output_quality_{};
+    QLabel *output_status_{};
     QComboBox *mouse_local_{};
     QLabel *mouse_hint_{};
     std::array<QCheckBox *, video_slot_count> mouse_enabled_{};
@@ -534,8 +605,8 @@ private:
     QComboBox *return_local_{};
 };
 QDialog *make_settings_dialog(QWidget *parent, std::shared_ptr<Receiver> receiver,
-                             Config initial, std::shared_ptr<MonitorReturn> returns, std::shared_ptr<VideoReceiver> video, std::shared_ptr<MouseReturn> mouse, ProgramMouse *control,
+                             Config initial, std::shared_ptr<MonitorReturn> returns, std::shared_ptr<VideoReceiver> video, std::shared_ptr<MouseReturn> mouse, ProgramMouse *control, std::shared_ptr<ProgramOutput> output,
                              std::function<bool(const Config &, std::string &)> apply) {
-    return new SettingsDialog(parent, std::move(receiver), std::move(initial), std::move(returns), std::move(video), std::move(mouse), control, std::move(apply));
+    return new SettingsDialog(parent, std::move(receiver), std::move(initial), std::move(returns), std::move(video), std::move(mouse), control, std::move(output), std::move(apply));
 }
 }

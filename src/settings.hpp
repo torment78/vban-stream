@@ -4,6 +4,7 @@
 #include "monitor-return.hpp"
 #include "video-receiver.hpp"
 #include "program-mouse.hpp"
+#include "program-output.hpp"
 #include <string>
 class QDialog;
 class QWidget;
@@ -11,7 +12,7 @@ namespace vban {
 Config read_config(std::string &error);
 bool write_config(const Config &config, std::string &error);
 QDialog *make_settings_dialog(QWidget *parent, std::shared_ptr<Receiver> receiver,
-    Config initial, std::shared_ptr<MonitorReturn> returns, std::shared_ptr<VideoReceiver> video, std::shared_ptr<MouseReturn> mouse, ProgramMouse *control,
+    Config initial, std::shared_ptr<MonitorReturn> returns, std::shared_ptr<VideoReceiver> video, std::shared_ptr<MouseReturn> mouse, ProgramMouse *control, std::shared_ptr<ProgramOutput> output,
     std::function<bool(const Config &, std::string &)> apply);
 std::string status_text(const Receiver &receiver, int index);
 }

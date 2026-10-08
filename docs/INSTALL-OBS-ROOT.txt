@@ -123,7 +123,7 @@ native dimensions after reception. After three seconds without a complete image,
 it goes black while retaining the last dimensions, and recovers automatically.
 
 Video sources contain no audio. Add the normal VBAN Stream audio source if needed.
-Mouse return can be enabled separately in the Mouse return tab.
+Each video input has its own Mouse control card, disabled initially.
 
 If Waiting continues, match the sender IP, stream name and shared UDP port, and
 allow incoming UDP for OBS on your LAN. Hover over Live status for decoded frames,
@@ -227,10 +227,10 @@ MOUSE RETURN FROM OBS PROGRAM
 2. On the remote computer, enable an incoming VBAN-TEXT stream. Set its sender IP
    to the OBS computer and choose a name such as Command1. Right-click its format
    or sample-rate field and enable Manage Mouse command.
-3. Open Tools > VBAN Stream Settings > Mouse return. Enable the return for Video 1
-   or Video 2. Enter that remote computer's IP, its VBAN UDP listen port and the
+3. Open Tools > VBAN Stream Settings > Video inputs. Under the matching video,
+   enable its Mouse control card. Enter that computer's IP, VBAN UDP port and the
    exact incoming command stream name. The command name is separate from video.
-4. Select the local LAN adapter under Send from this PC if needed. Click Apply.
+4. Select the local LAN adapter under Mouse control: send from this PC if needed. Click Apply.
 5. Enable OBS Studio Mode. Hold Ctrl while left/right-clicking or dragging inside
    the live App View in the Program pane. On Mac use the physical Control key.
    Preview remains for editing the scene.
@@ -244,6 +244,32 @@ leaving Studio Mode, losing focus or losing video also releases the remote butto
 Typing, mouse wheel, projectors and fullscreen Program are not supported.
 Sent counts accepted outgoing UDP packets; it does not confirm remote reception.
 This is a preview feature. Test it with your VoiceMeeter version before live use.
+
+SEND OBS PROGRAM TO VBAN FRAME
+
+1. Open Tools > VBAN Stream Settings > OBS to VBAN Frame.
+2. Enable Send OBS Program. Enter the receiving computer's IPv4 address,
+   UDP listen port and exact incoming video stream name.
+3. Select this OBS computer's LAN adapter if needed. Start with JPEG,
+   a 1280 x 720 resolution limit, 15 fps, quality 80 and 24 Mbps.
+4. Click Apply. In VBAN-Screen or another VBAN-Frame receiver, match the
+   OBS sender IP, video stream name and UDP port.
+
+The output follows live Program, including scene changes and transitions.
+Studio Mode is optional for video sending. The OBS interface, Preview and
+audio are not included. Use a separate monitor return for sound.
+The resolution limit preserves aspect ratio and never enlarges the image.
+PNG is lossless but can require more bandwidth. FPS and network limits are
+maximums; large images or a busy computer can reduce the actual frame rate.
+Queued old pictures are skipped to avoid a growing delay.
+
+Output is disabled initially and currently requires SDR video in OBS.
+Disable it and click Apply before changing OBS video settings or profiles.
+Sending and the frame counter report outgoing UDP, not remote reception.
+Hover over status for packet, byte and error counts. Reduce resolution,
+FPS or JPEG quality if frames are repeatedly skipped. An image-budget error
+means use JPEG, lower resolution or a higher network limit if your LAN allows it.
+Avoid including the received copy in the same outgoing Program scene.
 
 RETURN AUDIO BUFFER AND DIAGNOSTICS
 

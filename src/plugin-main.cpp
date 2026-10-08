@@ -23,6 +23,7 @@ std::shared_ptr<MonitorReturn> monitor_return;
 std::shared_ptr<VideoReceiver> video_receiver;
 std::shared_ptr<MouseReturn> mouse_return;
 std::unique_ptr<ProgramMouse> program_mouse;
+std::shared_ptr<ProgramOutput> program_output;
 Config desired_config;
 std::string startup_error;
 QPointer<QDialog> settings_dialog;
@@ -145,11 +146,14 @@ void show_settings() {
     if (!receiver) return;
     if (!settings_dialog) {
         settings_dialog = make_settings_dialog(static_cast<QWidget *>(obs_frontend_get_main_window()),
-            receiver, desired_config, monitor_return, video_receiver, mouse_return, program_mouse.get(), [](const Config &cfg, std::string &error) {
+            receiver, desired_config, monitor_return, video_receiver, mouse_return, program_mouse.get(), program_output, [](const Config &cfg, std::string &error) {
+                auto output_prepared = program_output->prepare(cfg.frame_output, error);
+                if (!output_prepared) return false;
                 auto mouse_prepared = mouse_return->prepare(cfg.mice, cfg.mouse_local_ip, error);
                 if (!mouse_prepared) return false;
                 auto prepared = monitor_return->prepare(cfg.returns, error, cfg.return_local_ip, cfg.return_buffer_ms);
                 if (!prepared || !receiver->configure(cfg, error, write_config)) return false;
+                program_output->activate(std::move(output_prepared));
                 program_mouse->cancel(); mouse_return->activate(std::move(mouse_prepared));
                 monitor_return->activate(std::move(prepared), cfg.return_buffer_ms);
                 for (size_t i = 0; i < return_count; ++i) {
@@ -345,6 +349,7 @@ void frontend_event(obs_frontend_event event, void *) {
         event == OBS_FRONTEND_EVENT_STUDIO_MODE_DISABLED || event == OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGING)) program_mouse->cancel();
     if (event == OBS_FRONTEND_EVENT_EXIT) {
         program_mouse.reset();
+        if (program_output) program_output->shutdown();
         close_ui();
         if (monitor_return) monitor_return->shutdown();
         if (video_receiver) video_receiver->shutdown();
@@ -362,6 +367,11 @@ bool obs_module_load(void) {
         desired_config = vban::read_config(startup_error);
         if (startup_error.empty()) receiver->configure(desired_config, startup_error);
         if (!startup_error.empty()) blog(LOG_WARNING, "[obs-vban-audio] %s", startup_error.c_str());
+        program_output = std::make_shared<ProgramOutput>();
+        std::string output_error;
+        auto prepared_output = program_output->prepare(desired_config.frame_output, output_error);
+        if (prepared_output) program_output->activate(std::move(prepared_output));
+        else blog(LOG_WARNING, "[obs-vban-audio] Program output: %s", output_error.c_str());
         mouse_return = std::make_shared<MouseReturn>();
         std::string mouse_error;
         auto prepared_mouse = mouse_return->prepare(desired_config.mice, desired_config.mouse_local_ip, mouse_error);
@@ -404,13 +414,13 @@ bool obs_module_load(void) {
         return true;
     } catch (const std::exception &e) {
         blog(LOG_ERROR, "[obs-vban-audio] Load failed: %s", e.what());
-        close_ui(); program_mouse.reset(); mouse_return.reset(); monitor_return.reset(); receiver.reset(); video_receiver.reset(); return false;
+        close_ui(); program_mouse.reset(); mouse_return.reset(); program_output.reset(); monitor_return.reset(); receiver.reset(); video_receiver.reset(); return false;
     }
 }
 void obs_module_unload(void) {
     obs_frontend_remove_event_callback(frontend_event, nullptr);
     close_ui();
-    program_mouse.reset(); mouse_return.reset();
+    program_mouse.reset(); mouse_return.reset(); program_output.reset();
     if (monitor_return) monitor_return->shutdown();
     monitor_return.reset();
     if (receiver) receiver->shutdown();

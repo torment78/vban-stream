@@ -12,7 +12,8 @@ Receive named VBAN streams with 1–8 channels each directly in OBS. Send the OB
 two computers, each with its own destination address, UDP port, and stream name.
 The 0.3.1 pre-release receives two VBAN-Frame video feeds, such as a
 VoiceMeeter App View or a remote display, and adds Ctrl-click mouse return from
-OBS Program in Studio Mode, on Windows x64 and macOS.
+OBS Program in Studio Mode. It also sends the live Program picture to a
+VBAN-Frame receiver, on Windows x64 and macOS.
 
 [**Windows installer — stable 0.2.2**](https://github.com/torment78/vban-stream/releases/download/v0.2.2/obs-vban-audio-0.2.2-windows-x64-setup.exe)
  · [Windows installer — development 0.3.1](https://github.com/torment78/vban-stream/releases/download/v0.3.1/vban-stream-0.3.1-windows-x64-setup.exe)
@@ -141,7 +142,7 @@ pixel count in portrait orientation. Before reception, a source shows a black
 its last dimensions, then recovers automatically when reception resumes.
 
 Each video source is video-only. Add **VBAN Stream** for accompanying audio.
-The **Mouse return** tab adds optional VoiceMeeter App View control.
+Each input has a **Mouse control** card for optional VoiceMeeter App View control.
 
 Hover over a video's status for incomplete frames, decode errors and queue drops.
 If these rise steadily, reduce the sender's frame rate/resolution, try JPEG, and
@@ -154,15 +155,15 @@ check the LAN. Incomplete images are dropped without displaying partial pictures
 2. On that computer, enable an incoming **VBAN-TEXT** stream. Use the OBS computer's
    sender IP, choose a command stream name (for example **Command1**), and enable
    **Manage Mouse command** from the stream's format/sample-rate context menu.
-3. Open **Tools → VBAN Stream Settings → Mouse return**. Enable the return for
-   **Video 1** or **Video 2**, enter that computer's destination IP, its VBAN UDP
+3. Open **Tools → VBAN Stream Settings → Video inputs**. Under the matching
+   video, enable **Mouse control for Video 1** or **Mouse control for Video 2**, enter that computer's destination IP, its VBAN UDP
    listen port, and the exact incoming command stream name. Click **Apply**.
 4. Turn on **Studio Mode**. Hold **Ctrl** and left-click, right-click or drag inside
    the live App View in the **Program** pane. On Mac, use the physical **Control** key.
    The Preview pane remains available for arranging the scene.
 
 Each video has its own mouse destination. The command stream name is separate
-from the video stream name. Use **Send from this PC** to select a LAN adapter if
+from the video stream name. Use **Mouse control: send from this PC** to select a LAN adapter if
 automatic routing chooses the wrong one. Mouse return starts disabled.
 
 Normal scene positioning, scaling, manual cropping, rotation, groups and nested
@@ -177,6 +178,34 @@ not supported. **Sent** counts outgoing UDP packets, not confirmed reception.
 
 Mouse return is a preview feature: please test it with your VoiceMeeter version
 before using it during a live show. [Setup and implementation details](docs/MOUSE-RETURN.md).
+
+## Send OBS Program to VBAN Frame
+
+1. Open **Tools → VBAN Stream Settings → OBS to VBAN Frame**.
+2. Enable **Send OBS Program**. Enter the receiving computer's IPv4 address,
+   UDP listen port and exact incoming video stream name.
+3. Select the OBS computer's LAN adapter if needed. Start with **JPEG**, a
+   **1280 × 720** resolution limit, **15 fps**, quality **80** and **24 Mbps**.
+4. Click **Apply**. In VBAN-Screen or another VBAN-Frame receiver, select the
+   OBS computer as sender and use the same stream name and port.
+
+This sends the live Program picture, including scene changes and transitions.
+Studio Mode is optional for sending video. It does not include the OBS interface,
+Preview pane or audio. For sound, configure a monitor return separately.
+
+The resolution limit preserves aspect ratio and never enlarges the picture.
+PNG is lossless and can use more bandwidth than JPEG. FPS and network settings
+are upper limits: large images or a busy computer can reduce the actual frame rate.
+The sender skips queued pictures rather than building a growing delay.
+
+Sending starts disabled. It currently requires an SDR OBS video colour space.
+Disable this output and click Apply before changing OBS video settings or profiles.
+**Sending** and the frame counter show outgoing UDP traffic, not confirmation
+from the other computer. Hover over status for packet, byte and error counters.
+If frames are repeatedly skipped, lower resolution, FPS or JPEG quality; for an
+image-budget error, use JPEG or increase the network limit if the LAN allows it.
+Avoid including the received copy in the same outgoing Program scene.
+[Protocol and testing details](docs/PROGRAM-OUTPUT.md).
 
 ## Send the monitor mix back
 

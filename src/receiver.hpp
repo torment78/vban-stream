@@ -4,6 +4,7 @@
 #include "return-config.hpp"
 #include "video-config.hpp"
 #include "mouse-return.hpp"
+#include "frame-output-config.hpp"
 #include <atomic>
 #include <condition_variable>
 #include <functional>
@@ -22,6 +23,7 @@ struct Config {
     uint16_t port = 6980;
     std::array<SlotConfig, slot_count> slots;
     VideoConfigs videos;
+    FrameOutputConfig frame_output;
     MouseConfigs mice;
     std::string mouse_local_ip;
     ReturnConfigs returns = default_returns();

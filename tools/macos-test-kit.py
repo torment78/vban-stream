@@ -11,7 +11,7 @@ import sys
 import tarfile
 
 ROOT=Path(__file__).resolve().parents[1]
-TESTS=("vban-tests","return-tests","video-tests","mouse-tests","mouse-scene-tests","obs-smoke","obs-return-smoke","obs-multichannel")
+TESTS=("vban-tests","return-tests","video-tests","frame-sender-tests","mouse-tests","mouse-scene-tests","obs-smoke","obs-return-smoke","obs-multichannel")
 
 def run(*args,**kwargs):
     return subprocess.run([str(a) for a in args],check=True,**kwargs)

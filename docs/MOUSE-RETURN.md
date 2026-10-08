@@ -6,8 +6,9 @@ See the [user setup steps](../README.md#control-voicemeeter-from-program).
 
 ## Configuration and compatibility
 
-The third dark settings tab contains two independent enabled/IP/port/stream-name
-groups and a local adapter selector. Settings remain version 1: the optional
+The dark Video inputs tab contains a Mouse control card directly beneath each
+video's receive settings, with enabled/IP/port/stream-name fields and a shared
+local adapter selector. The page scrolls when needed. Settings remain version 1: the optional
 `mouse_returns` array and `mouse_local_ip` field default to disabled/automatic
 when absent. Existing audio/video settings, source IDs and installed DLL names
 are unchanged. Apply validates both mouse routes before committing any settings.
@@ -74,7 +75,7 @@ Preview, projectors, and fullscreen Program windows.
   defaults and duplicate destination rejection.
 - `mouse-scene-tests`: real OBS transforms, scale/crop/rotation, overlays, hidden
   items, bounding crop rejection, high DPI and letterboxing.
-- `obs-smoke`: actual plugin load, old-config defaults, saved routes and dark tab.
+- `obs-smoke`: actual plugin load, old-config defaults, saved routes and the two nested dark mouse cards.
 - `obs-video-smoke32`: actual distributed DLL with OBS 32.2.1 and D3D11; two live
   PNG/JPEG streams plus synthetic Qt Program/Preview widgets. Internal Qt events
   verify Ctrl gating, independent destinations, drag/final coordinates, button-up
