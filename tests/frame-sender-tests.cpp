@@ -62,6 +62,12 @@ int main(int argc,char**argv){try{
     check(sender.status().errors>0&&sender.status().dropped>0,"Over-budget PNG and queued replacement are counted");
     check(net::readable(second.socket,20)==0,"Oversized image sends no incomplete burst");
     sender.shutdown();check(!sender.status().enabled,"Shutdown disables capture and joins encoding worker");
+    // Exercise a worker stopping while entering its idle wait, including
+    // prepared routes abandoned by a later validation failure.
+    for(int attempt=0;attempt<64;++attempt){
+        route=sender.prepare(cfg,320,180,error);check(bool(route),error.c_str());
+        if(attempt%2){sender.activate(route);route.reset();sender.shutdown();}else route.reset();
+    }
     cfg.enabled=false;route=sender.prepare(cfg,0,0,error);sender.activate(route);sender.capture(noise.constBits(),uint32_t(noise.bytesPerLine()),now());check(net::readable(second.socket,20)==0,"Disabled route stays quiet");
     std::cout<<"PASS: PNG/JPEG sender, byte order, rate gate, multi-packet framing, pacing, destination changes, bounded backlog, invalid configuration and shutdown.\n";return 0;
 }catch(const std::exception&e){std::cerr<<"Frame sender test failed: "<<e.what()<<"\n";return 1;}}

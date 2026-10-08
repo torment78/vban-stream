@@ -7,6 +7,9 @@
 #include <QBuffer>
 #include <QImageWriter>
 #include <algorithm>
+#include <array>
+#include <mutex>
+#include <vector>
 #include <chrono>
 #include <condition_variable>
 #include <cstring>
@@ -31,8 +34,14 @@ struct FrameSender::Session {
     std::shared_ptr<std::atomic<uint32_t>> sequence;
     int pending = -1, busy = -1;
     uint64_t next_timestamp = 0, previous_timestamp = 0; // Producer only.
+    void request_stop() {
+        // Pair the stop predicate with the same mutex used by wait(). This
+        // prevents a notification being lost between checking and sleeping.
+        { std::lock_guard lock(mutex); stop = true; }
+        wake.notify_all();
+    }
     ~Session() {
-        stop = true; wake.notify_all();
+        request_stop();
         if (worker.joinable()) worker.join();
         if (socket != net::invalid) net::close(socket);
     }
@@ -164,7 +173,7 @@ FrameSender::Prepared FrameSender::prepare(const FrameOutputConfig &cfg,uint32_t
     return next;
 }
 void FrameSender::activate(Prepared next) { shutdown();active_=std::move(next); }
-void FrameSender::shutdown() { if(active_) {active_->stop=true;active_->wake.notify_all();if(active_->worker.joinable())active_->worker.join();}active_.reset(); }
+void FrameSender::shutdown() { if(active_) {active_->request_stop();if(active_->worker.joinable())active_->worker.join();}active_.reset(); }
 void FrameSender::capture(const uint8_t *rgba,uint32_t stride,uint64_t timestamp) noexcept { if(active_)active_->capture(rgba,stride,timestamp); }
 std::pair<int,int> FrameSender::dimensions(const Prepared &s) { return s?std::pair{s->width,s->height}:std::pair{0,0}; }
 FrameOutputStatus FrameSender::status() const {
