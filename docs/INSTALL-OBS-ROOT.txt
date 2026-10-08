@@ -1,9 +1,9 @@
-VBAN Stream 0.3.0 - Installation and usage
+VBAN Stream 0.3.1 - Installation and usage
 
 INSTALLER (STANDARD OR PORTABLE OBS)
 
 1. Close all OBS Studio windows.
-2. Run vban-stream-0.3.0-windows-x64-setup.exe.
+2. Run vban-stream-0.3.1-windows-x64-setup.exe.
    Approve the Windows administrator prompt. Protected folders such as
    Program Files need administrator access.
 3. Select one option:
@@ -35,10 +35,10 @@ The plugin works with normal and portable OBS Studio on Windows x64.
 Both ZIP files contain the same plugin DLL, arranged for different install paths.
 Install only one copy.
 
-- vban-stream-0.3.0-obs-root.zip:
+- vban-stream-0.3.1-obs-root.zip:
   Merge into the OBS installation folder. Works with normal AND portable OBS.
 
-- vban-stream-0.3.0-windows-x64.zip:
+- vban-stream-0.3.1-windows-x64.zip:
   Copy the obs-vban-audio folder into C:\ProgramData\obs-studio\plugins
   for a normal OBS installation.
 
@@ -123,7 +123,7 @@ native dimensions after reception. After three seconds without a complete image,
 it goes black while retaining the last dimensions, and recovers automatically.
 
 Video sources contain no audio. Add the normal VBAN Stream audio source if needed.
-Remote mouse control is not included in this development build.
+Mouse return can be enabled separately in the Mouse return tab.
 
 If Waiting continues, match the sender IP, stream name and shared UDP port, and
 allow incoming UDP for OBS on your LAN. Hover over Live status for decoded frames,
@@ -220,6 +220,30 @@ Reopen settings to refresh the adapter list.
 
 Never feed a received OBS return into a VBAN stream that comes back into OBS.
 That creates an audio feedback loop.
+
+MOUSE RETURN FROM OBS PROGRAM
+
+1. Receive the remote VoiceMeeter App View as a VBAN Video source in your scene.
+2. On the remote computer, enable an incoming VBAN-TEXT stream. Set its sender IP
+   to the OBS computer and choose a name such as Command1. Right-click its format
+   or sample-rate field and enable Manage Mouse command.
+3. Open Tools > VBAN Stream Settings > Mouse return. Enable the return for Video 1
+   or Video 2. Enter that remote computer's IP, its VBAN UDP listen port and the
+   exact incoming command stream name. The command name is separate from video.
+4. Select the local LAN adapter under Send from this PC if needed. Click Apply.
+5. Enable OBS Studio Mode. Hold Ctrl while left/right-clicking or dragging inside
+   the live App View in the Program pane. On Mac use the physical Control key.
+   Preview remains for editing the scene.
+
+Mouse return is disabled initially. Each video has its own destination.
+Scene positioning, scaling, manual cropping, rotation, groups and nested scenes
+are supported. Keep the sender's App View at its original size. Visible overlays
+block clicks through them; filters and Crop to Bounding Box disable interaction.
+Release Ctrl, press Esc, or leave the picture to end a drag. Changing scenes,
+leaving Studio Mode, losing focus or losing video also releases the remote button.
+Typing, mouse wheel, projectors and fullscreen Program are not supported.
+Sent counts accepted outgoing UDP packets; it does not confirm remote reception.
+This is a preview feature. Test it with your VoiceMeeter version before live use.
 
 RETURN AUDIO BUFFER AND DIAGNOSTICS
 

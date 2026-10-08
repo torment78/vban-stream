@@ -12,7 +12,7 @@
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("obs-vban-audio", "en-US")
 MODULE_EXPORT const char *obs_module_description(void) {
-    return "VBAN audio and video receiver with eight audio slots, two video slots and two monitor returns.";
+    return "VBAN receiver with eight audio inputs, two video inputs, Program mouse control and two monitor returns.";
 }
 MODULE_EXPORT const char *obs_module_name(void) { return "VBAN Stream"; }
 
@@ -21,6 +21,8 @@ using namespace vban;
 std::shared_ptr<Receiver> receiver;
 std::shared_ptr<MonitorReturn> monitor_return;
 std::shared_ptr<VideoReceiver> video_receiver;
+std::shared_ptr<MouseReturn> mouse_return;
+std::unique_ptr<ProgramMouse> program_mouse;
 Config desired_config;
 std::string startup_error;
 QPointer<QDialog> settings_dialog;
@@ -143,9 +145,12 @@ void show_settings() {
     if (!receiver) return;
     if (!settings_dialog) {
         settings_dialog = make_settings_dialog(static_cast<QWidget *>(obs_frontend_get_main_window()),
-            receiver, desired_config, monitor_return, video_receiver, [](const Config &cfg, std::string &error) {
+            receiver, desired_config, monitor_return, video_receiver, mouse_return, program_mouse.get(), [](const Config &cfg, std::string &error) {
+                auto mouse_prepared = mouse_return->prepare(cfg.mice, cfg.mouse_local_ip, error);
+                if (!mouse_prepared) return false;
                 auto prepared = monitor_return->prepare(cfg.returns, error, cfg.return_local_ip, cfg.return_buffer_ms);
                 if (!prepared || !receiver->configure(cfg, error, write_config)) return false;
+                program_mouse->cancel(); mouse_return->activate(std::move(mouse_prepared));
                 monitor_return->activate(std::move(prepared), cfg.return_buffer_ms);
                 for (size_t i = 0; i < return_count; ++i) {
                     const auto s = monitor_return->status(i);
@@ -336,7 +341,10 @@ void close_ui() {
     delete settings_action.data();
 }
 void frontend_event(obs_frontend_event event, void *) {
+    if (program_mouse && (event == OBS_FRONTEND_EVENT_SCENE_CHANGED || event == OBS_FRONTEND_EVENT_TRANSITION_CHANGED ||
+        event == OBS_FRONTEND_EVENT_STUDIO_MODE_DISABLED || event == OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGING)) program_mouse->cancel();
     if (event == OBS_FRONTEND_EVENT_EXIT) {
+        program_mouse.reset();
         close_ui();
         if (monitor_return) monitor_return->shutdown();
         if (video_receiver) video_receiver->shutdown();
@@ -354,6 +362,12 @@ bool obs_module_load(void) {
         desired_config = vban::read_config(startup_error);
         if (startup_error.empty()) receiver->configure(desired_config, startup_error);
         if (!startup_error.empty()) blog(LOG_WARNING, "[obs-vban-audio] %s", startup_error.c_str());
+        mouse_return = std::make_shared<MouseReturn>();
+        std::string mouse_error;
+        auto prepared_mouse = mouse_return->prepare(desired_config.mice, desired_config.mouse_local_ip, mouse_error);
+        if (prepared_mouse) mouse_return->activate(std::move(prepared_mouse));
+        else blog(LOG_WARNING, "[obs-vban-audio] Mouse return: %s", mouse_error.c_str());
+        program_mouse = std::make_unique<ProgramMouse>(mouse_return, video_receiver);
         monitor_return = std::make_shared<MonitorReturn>();
         std::string return_error;
         auto prepared_returns = monitor_return->prepare(desired_config.returns, return_error, desired_config.return_local_ip, desired_config.return_buffer_ms);
@@ -390,12 +404,13 @@ bool obs_module_load(void) {
         return true;
     } catch (const std::exception &e) {
         blog(LOG_ERROR, "[obs-vban-audio] Load failed: %s", e.what());
-        close_ui(); monitor_return.reset(); receiver.reset(); video_receiver.reset(); return false;
+        close_ui(); program_mouse.reset(); mouse_return.reset(); monitor_return.reset(); receiver.reset(); video_receiver.reset(); return false;
     }
 }
 void obs_module_unload(void) {
     obs_frontend_remove_event_callback(frontend_event, nullptr);
     close_ui();
+    program_mouse.reset(); mouse_return.reset();
     if (monitor_return) monitor_return->shutdown();
     monitor_return.reset();
     if (receiver) receiver->shutdown();

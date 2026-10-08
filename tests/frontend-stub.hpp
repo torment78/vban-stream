@@ -4,6 +4,7 @@
 struct TestFrontend : obs_frontend_callbacks {
  QWidget &window;
  QAction *action = nullptr;
+ bool studio_mode = false;
  std::vector<std::pair<obs_frontend_event_cb, void *>> events;
  explicit TestFrontend(QWidget &w):window(w){}
  void *obs_frontend_get_main_window(void) override { return &window; }
@@ -77,7 +78,7 @@ struct TestFrontend : obs_frontend_callbacks {
  obs_service_t *obs_frontend_get_streaming_service(void) override { return {}; }
  void obs_frontend_set_streaming_service(obs_service_t *service) override {  }
  void obs_frontend_save_streaming_service() override {  }
- bool obs_frontend_preview_program_mode_active(void) override { return {}; }
+ bool obs_frontend_preview_program_mode_active(void) override { return studio_mode; }
  void obs_frontend_set_preview_program_mode(bool enable) override {  }
  void obs_frontend_preview_program_trigger_transition(void) override {  }
  bool obs_frontend_preview_enabled(void) override { return {}; }

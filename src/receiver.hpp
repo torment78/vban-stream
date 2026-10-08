@@ -3,6 +3,7 @@
 #include "stream-buffer.hpp"
 #include "return-config.hpp"
 #include "video-config.hpp"
+#include "mouse-return.hpp"
 #include <atomic>
 #include <condition_variable>
 #include <functional>
@@ -21,6 +22,8 @@ struct Config {
     uint16_t port = 6980;
     std::array<SlotConfig, slot_count> slots;
     VideoConfigs videos;
+    MouseConfigs mice;
+    std::string mouse_local_ip;
     ReturnConfigs returns = default_returns();
     uint32_t return_buffer_ms = default_return_buffer_ms;
     std::string return_local_ip; // Empty: let Windows select the sending adapter.

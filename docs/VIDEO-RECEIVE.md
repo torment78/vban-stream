@@ -37,8 +37,9 @@ native incoming dimensions once available, and returns to black at its last size
 after three seconds without a complete image. Received PNG alpha is preserved.
 
 The dialog is dark, scoped to the plugin window. It does not change OBS's global
-theme. This version does not send mouse/keyboard commands and does not advertise
-OBS source interaction support.
+theme. Version 0.3.1 adds optional [mouse return](MOUSE-RETURN.md) through the
+Studio Mode Program view. The source still does not advertise a separate OBS
+Interact window, and keyboard typing is not forwarded.
 
 ## Verification
 

@@ -178,6 +178,11 @@ int main(int argc,char **argv) {
         auto *video_second = dialog->findChild<QCheckBox *>("video_1_enabled");
         check(video_enabled && video_ip && video_stream && video_label && video_second, "Two video inputs in main settings");
         video_enabled->setChecked(true); video_ip->setText("127.0.0.1"); video_stream->setText("VIDEO1"); video_label->setText("Mixer screen");
+        auto *mouse_enable = dialog->findChild<QCheckBox *>("mouse_0_enabled");
+        auto *mouse_ip = dialog->findChild<QLineEdit *>("mouse_0_ip");
+        auto *mouse_name = dialog->findChild<QLineEdit *>("mouse_0_name");
+        check(mouse_enable && mouse_ip && mouse_name && !mouse_enable->isChecked(), "Mouse return defaults disabled for old settings");
+        mouse_enable->setChecked(true); mouse_ip->setText("127.0.0.1"); mouse_name->setText("Command1");
         stream->setText("CHANGED");
         auto *buttons=dialog->findChild<QDialogButtonBox*>();
         buttons->button(QDialogButtonBox::Apply)->click();app.processEvents();
@@ -185,6 +190,9 @@ int main(int argc,char **argv) {
         check(file.open(QIODevice::ReadOnly),"Read persisted settings");
         const auto saved=QJsonDocument::fromJson(file.readAll()).object();file.close();
         check(saved.value("slots").toArray()[0].toObject().value("stream_name")=="CHANGED","Settings save atomically");
+        check(saved.value("mouse_returns").toArray().size()==2, "Two mouse routes persisted");
+        check(saved.value("mouse_returns").toArray()[0].toObject().value("enabled").toBool(), "Mouse enable persisted");
+        check(saved.value("mouse_returns").toArray()[0].toObject().value("stream_name")=="Command1", "Command stream persisted");
         check(saved.value("videos").toArray().size()==2, "Two video slots persisted with audio settings");
         check(saved.value("videos").toArray()[0].toObject().value("stream_name")=="VIDEO1", "Video stream setup saved");
         check(std::string(obs_source_get_display_name("vban_video_input"))=="VBAN Video", "Separate VBAN Video Add Source entry");
@@ -197,6 +205,8 @@ int main(int argc,char **argv) {
         obs_properties_destroy(video_props);
         auto *tabs=dialog->findChild<QTabWidget *>("vban_tabs");check(tabs,"Video tab exists");
         tabs->setCurrentIndex(1);app.processEvents();dialog->grab().save(root+"/video-settings-dialog.png");
+        check(tabs->count()==3,"Mouse return is the third tab");
+        tabs->setCurrentIndex(2);app.processEvents();dialog->grab().save(root+"/mouse-settings-dialog.png");
         tabs->setCurrentIndex(0);obs_source_release(video_source);
         const int before=a.count;
         send("CHANGED",600,2,2);
