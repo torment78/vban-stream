@@ -101,7 +101,7 @@ def main():
     (resources / "welcome.html").write_text("<html><body><h1>VBAN Stream</h1><p>by ElkaSoft</p>"
         "<p>Mac test build " + VERSION + " for OBS Studio 31.1.1 or later. macOS 13 or later.</p>"
         "<p>Quit OBS before installing. Installs for your current user in Library/Application Support/obs-studio/plugins.</p>"
-        "<p>Eight audio inputs with up to eight channels each, two VBAN video inputs, and two stereo monitor returns.</p>"
+        "<p>Eight audio inputs with up to eight channels each, two stereo monitor returns, two VBAN Frame inputs, two mouse-control routes, and OBS Program video output.</p>"
         "<p>This test package uses ad-hoc signing and is not Apple notarized. Read INSTALL-MAC.txt before testing.</p>"
         "<p><a href=\"https://elkasoft.xyz/\">ElkaSoft website</a></p></body></html>")
     installer = destination / ("vban-stream-" + VERSION + "-macos-universal-test.pkg")

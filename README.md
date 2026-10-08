@@ -10,16 +10,16 @@ An independent plugin by **ElkaSoft** for OBS Studio.
 
 Receive named VBAN streams with 1–8 channels each directly in OBS. Send the OBS monitoring mix back to
 two computers, each with its own destination address, UDP port, and stream name.
-The 0.3.4 Windows pre-release receives two VBAN-Frame video feeds, such as a
+The 0.3.5 development release receives two VBAN-Frame video feeds, such as a
 VoiceMeeter App View or a remote display, and adds Ctrl-click mouse return from
 OBS Program in Studio Mode. It also sends the live Program picture to a
-VBAN-Frame receiver. The Mac test build remains at 0.3.2 while Windows functionality is tested.
+VBAN-Frame receiver. Windows x64 and universal Mac test installers are available.
 
 [**Windows installer — stable 0.2.2**](https://github.com/torment78/vban-stream/releases/download/v0.2.2/obs-vban-audio-0.2.2-windows-x64-setup.exe)
- · [Windows installer — development 0.3.4](https://github.com/torment78/vban-stream/releases/download/v0.3.4/vban-stream-0.3.4-windows-x64-setup.exe)
- · [Mac installer — development 0.3.2](https://github.com/torment78/vban-stream/releases/download/v0.3.2/vban-stream-0.3.2-macos-universal-test.pkg)
+ · [Windows installer — development 0.3.5](https://github.com/torment78/vban-stream/releases/download/v0.3.5/vban-stream-0.3.5-windows-x64-setup.exe)
+ · [Mac installer — development 0.3.5](https://github.com/torment78/vban-stream/releases/download/v0.3.5/vban-stream-0.3.5-macos-universal-test.pkg)
  · [Download all banners](https://github.com/torment78/vban-stream/releases/download/v0.2.5/VBAN-Stream-artwork.zip)
- · [Installation guide](https://github.com/torment78/vban-stream/releases/download/v0.3.4/VBAN-INSTALL.txt)
+ · [Installation guide](https://github.com/torment78/vban-stream/releases/download/v0.3.5/VBAN-INSTALL.txt)
  · [Report an issue](https://github.com/torment78/vban-stream/issues)
 
 [![Donate on Ko-fi](https://img.shields.io/badge/Donate-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/msffixit)
@@ -30,34 +30,34 @@ Free and open source under GPL-2.0-or-later. Donations support development and a
 
 ## Download and install
 
-The Windows development build is **0.3.4**; the Mac test build remains **0.3.2**. The latest stable version is **0.2.2** and retains the earlier VBAN Audio name. Tested with **OBS 31.1.1** and **OBS 32.2.1** on Windows x64.
+The Windows and Mac development builds are **0.3.5**. The latest stable version is **0.2.2** and retains the earlier VBAN Audio name. Tested with **OBS 31.1.1** and **OBS 32.2.1** on Windows x64.
 
 Use the setup installer for both stable and development builds.
 
 | Installer | Version and platform |
 | --- | --- |
 | [Windows stable setup](https://github.com/torment78/vban-stream/releases/download/v0.2.2/obs-vban-audio-0.2.2-windows-x64-setup.exe) | 0.2.2, Windows x64, standard or portable OBS |
-| [Windows development setup](https://github.com/torment78/vban-stream/releases/download/v0.3.4/vban-stream-0.3.4-windows-x64-setup.exe) | 0.3.4 pre-release, Windows x64, standard or portable OBS |
-| [Mac development installer](https://github.com/torment78/vban-stream/releases/download/v0.3.2/vban-stream-0.3.2-macos-universal-test.pkg) | 0.3.2 pre-release, Apple Silicon and Intel |
+| [Windows development setup](https://github.com/torment78/vban-stream/releases/download/v0.3.5/vban-stream-0.3.5-windows-x64-setup.exe) | 0.3.5 pre-release, Windows x64, standard or portable OBS |
+| [Mac development installer](https://github.com/torment78/vban-stream/releases/download/v0.3.5/vban-stream-0.3.5-macos-universal-test.pkg) | 0.3.5 pre-release, Apple Silicon and Intel |
 
 Source code and optional manual packages are available separately on GitHub.
 
 ### macOS test build
 
-The [0.3.2 Mac pre-release](https://github.com/torment78/vban-stream/releases/tag/v0.3.2)
+The [0.3.5 Mac pre-release](https://github.com/torment78/vban-stream/releases/tag/v0.3.5)
 is for testing on **macOS 13 or later**, with **OBS Studio 31.1.1 or later**.
 The universal `.plugin` bundle contains both Apple Silicon and Intel code.
 
-Use the [Mac setup installer](https://github.com/torment78/vban-stream/releases/download/v0.3.2/vban-stream-0.3.2-macos-universal-test.pkg). It installs into
+Use the [Mac setup installer](https://github.com/torment78/vban-stream/releases/download/v0.3.5/vban-stream-0.3.5-macos-universal-test.pkg). It installs into
 `~/Library/Application Support/obs-studio/plugins`. Quit OBS before installation.
 These test builds use ad-hoc signing and are not Apple notarized; the
-[Mac installation and testing guide](https://github.com/torment78/vban-stream/releases/download/v0.3.2/INSTALL-MAC.txt) explains approval and
+[Mac installation and testing guide](https://github.com/torment78/vban-stream/releases/download/v0.3.5/INSTALL-MAC.txt) explains approval and
 includes a listening checklist. Sustained audio and real OBS GUI testing are still
 required before promoting Mac support to a stable release.
 
 ### Using the Windows installer
 
-1. Close OBS, run **vban-stream-0.3.4-windows-x64-setup.exe**, and approve the Windows administrator prompt.
+1. Close OBS, run **vban-stream-0.3.5-windows-x64-setup.exe**, and approve the Windows administrator prompt.
 2. Choose **Standard OBS installation** (selected by default) or **Portable OBS**.
 3. Check the detected standard OBS folder, or click **Browse** to choose your portable
    OBS root: the folder containing **bin**, **data**, and **obs-plugins**.
@@ -207,7 +207,7 @@ limits: encoding, image size and receiver performance can reduce actual frame ra
 The sender keeps the newest queued picture so old frames do not build up.
 
 JPEG quality 100 can still produce large transfers: each changing picture is a
-complete image. Version 0.3.4 spaces individual video packets across the frame
+complete image. Version 0.3.5 spaces individual video packets across the frame
 interval to reduce bursts at the receiver. JPEG file-size optimization retains the selected
 quality. Actual playback and error counters must be checked at the receiving app.
 **Mbps means megabits per second**: 80 Mbps is about 10 megabytes per second.

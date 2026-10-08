@@ -1,4 +1,4 @@
-# OBS Program output in VBAN Stream 0.3.4
+# OBS Program output in VBAN Stream 0.3.5
 
 The third settings tab, **OBS to VBAN Frame**, sends the main OBS Program picture
 as JPEG or PNG over UDP. See the [setup instructions](../README.md#send-obs-program-to-vban-frame).
@@ -71,8 +71,8 @@ therefore leave more time for receivers that decode on their UDP-reading thread.
 Windows uses a cancellable high-resolution waitable timer for waits over 1 ms,
 then yields through the remaining sub-millisecond interval. This avoids rounding
 every short packet wait up and lowering FPS; the precision tail costs video-worker
-CPU time. macOS uses an interruptible condition-variable wait, but this release is
-built and tested on Windows only. Neither changes global timer resolution or audio
+CPU time. macOS uses an interruptible condition-variable wait. Version 0.3.5 also rebuilds
+the universal Mac package; native Mac playback still requires a live test. Neither changes global timer resolution or audio
 worker priority.
 This gap cannot compensate for every receiver's decode speed or socket capacity.
 An image exceeding one second's network budget is
@@ -200,3 +200,11 @@ not a guaranteed minimum receiver-buffer size. Those detailed JPEG-100 images
 still used about 70 Mbps at only 7 FPS because each image is roughly a megabyte.
 The normal adaptive 720p/1080p tests remained at 29.3–29.7 FPS with no incomplete
 pictures. Fixed JPEG 100 is not a substitute for an inter-frame video codec.
+
+## 0.3.5 development refresh
+
+Version 0.3.5 rebuilds the 0.3.4 sender for Windows and universal Mac. The user
+confirmed that the 0.3.4 Windows LAN test now has smooth frames, good responsiveness
+and no glitches. That result is specific to the tested Windows setup. Mac uses
+a different scheduling primitive and still needs sustained real-device playback.
+The release remains a development pre-release; stable is not promoted.

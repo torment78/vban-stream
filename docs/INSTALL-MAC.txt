@@ -1,4 +1,4 @@
-VBAN STREAM 0.3.2 - MAC TEST BUILD
+VBAN STREAM 0.3.5 - MAC TEST BUILD
 by ElkaSoft
 
 REQUIREMENTS
@@ -8,7 +8,7 @@ This is a test release. A real OBS session and sustained LAN audio test are requ
 
 INSTALL WITH THE PKG
 1. Quit OBS Studio.
-2. Open vban-stream-0.3.2-macos-universal-test.pkg and follow the installer.
+2. Open vban-stream-0.3.5-macos-universal-test.pkg and follow the installer.
 3. Install for your current user. The plugin goes here:
    ~/Library/Application Support/obs-studio/plugins/obs-vban-audio.plugin
 4. Restart OBS. Open Tools > VBAN Stream Settings.
