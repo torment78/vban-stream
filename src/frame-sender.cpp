@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "socket-platform.hpp"
 #include "frame-sender.hpp"
+#include "worker-platform.hpp"
 #include "frame-protocol.hpp"
 #include "vban-transmitter.hpp"
 #include <QImage>
@@ -30,6 +31,7 @@ struct FrameSender::Session {
     mutable std::mutex mutex;
     std::condition_variable wake, send_wake;
     std::thread worker, transmitter;
+    WorkerWait pacing_wait;
     struct EncodedFrame { QByteArray bytes; uint64_t captured = 0; int quality = 0; };
     std::optional<EncodedFrame> ready;
     std::atomic<bool> stop{false};
@@ -51,6 +53,7 @@ struct FrameSender::Session {
         // Pair the stop predicate with the same mutex used by wait(). This
         // prevents a notification being lost between checking and sleeping.
         { std::lock_guard lock(mutex); stop = true; }
+        pacing_wait.stop();
         wake.notify_all();send_wake.notify_all();
     }
     ~Session() {
@@ -83,6 +86,21 @@ struct FrameSender::Session {
         const auto packets=(uint64_t(encoded.size())+1435)/1436;
         return uint64_t(encoded.size())+packets*(header_size+66);
     }
+    void pace_until(Clock::time_point deadline) {
+        while(!stop) {
+            const auto left=std::chrono::duration_cast<std::chrono::nanoseconds>(deadline-Clock::now()).count();
+            if(left<=0)return;
+#ifdef _WIN32
+            // Windows rounds short timer waits. Block for the bulk of a wait,
+            // then yield for at most 200 us rather than rounding each burst to
+            // a whole millisecond. This is only the video transmitter thread.
+            if(left>250'000)pacing_wait.wait(left-200'000);
+            else std::this_thread::yield();
+#else
+            pacing_wait.wait(left);
+#endif
+        }
+    }
     bool send_image(const QByteArray &encoded, uint64_t captured) {
         const auto bit_rate=uint64_t(config.mbps)*1'000'000ULL;
         const auto count=(size_t(encoded.size())+1435)/1436;
@@ -98,14 +116,17 @@ struct FrameSender::Session {
         std::memcpy(packet.data()+8,config.stream_name.data(),config.stream_name.size());
         const auto frame=sequence->fetch_add(1);
         for (unsigned i=0;i<4;++i) packet[24+i]=uint8_t(frame>>(8*i));
-        const auto began=Clock::now(); uint64_t sent=0;
+        const auto began=Clock::now(); auto batch_began=began;uint64_t sent=0,batch_bytes=0;
         for (size_t index=0;index<count;++index) {
             if (stop) return false;
-            // Small packet batches avoid an image-sized UDP burst competing with audio.
-            if (index%16==0 && index) {
-                const auto deadline=began+std::chrono::nanoseconds(sent*8'000'000'000ULL/bit_rate);
-                std::unique_lock lock(mutex);
-                if (send_wake.wait_until(lock,deadline,[this]{return stop.load();})) return false;
+            // Four datagrams fit in a small receive buffer. Pace from the actual
+            // previous burst, never from the beginning of the image: a late wake
+            // must not cause several "catch-up" bursts to be dumped at once.
+            if (index%4==0 && index) {
+                const auto deadline=batch_began+std::chrono::nanoseconds(batch_bytes*8'000'000'000ULL/bit_rate);
+                pace_until(deadline);
+                if(stop)return false;
+                batch_began=Clock::now();batch_bytes=0;
             }
             if (Clock::now()-began>std::chrono::milliseconds(1500)) { ++dropped; fail("Video sender missed its network deadline."); return false; }
             const size_t offset=index*1436, length=std::min(size_t(1436),size_t(encoded.size())-offset);
@@ -117,14 +138,16 @@ struct FrameSender::Session {
             if (::send(socket,reinterpret_cast<const char*>(packet.data()),size,0)!=size) {
                 ++dropped;fail("Video UDP send failed (socket "+std::to_string(net::error())+").");return false;
             }
-            ++packets;bytes+=uint64_t(size);sent+=uint64_t(size)+66;
+            ++packets;bytes+=uint64_t(size);sent+=uint64_t(size)+66;batch_bytes+=uint64_t(size)+66;
         }
         ++frames;const auto completed=clock_ns();sent_at=completed;
         age_ns=completed-captured;
         { std::lock_guard lock(mutex);error.clear();marks[mark_index++%marks.size()]={completed,sent}; }
-        // Include the last batch in pacing, even when an entire picture is tiny.
-        std::unique_lock lock(mutex);
-        send_wake.wait_until(lock,began+std::chrono::nanoseconds(sent*8'000'000'000ULL/bit_rate),[this]{return stop.load();});
+        // Pace the final burst too, then leave a short gap for receivers that
+        // decode a completed JPEG on the same thread that drains their socket.
+        const auto deadline=batch_began+std::chrono::nanoseconds(batch_bytes*8'000'000'000ULL/bit_rate);
+        pace_until(deadline);
+        if(!stop)pacing_wait.wait(2'000'000);
         send_ns=uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now()-began).count());
         return true;
     }
@@ -144,7 +167,11 @@ struct FrameSender::Session {
     bool encode(const QImage &image, QByteArray &encoded, int quality) {
         encoded.clear(); QBuffer buffer(&encoded);buffer.open(QIODevice::WriteOnly);
         QImageWriter writer(&buffer,config.format.c_str());
-        if(config.format=="JPEG") writer.setQuality(quality);
+        if(config.format=="JPEG") {
+            writer.setQuality(quality);
+            // Optimize entropy tables, keeping the same quantization and pixels.
+            writer.setOptimizedWrite(true);
+        }
         else writer.setCompression(25); // PNG stays lossless; avoid the default expensive compression level.
         if(writer.write(image)) return true;
         ++dropped;fail("Image encoding failed: "+writer.errorString().toStdString());return false;

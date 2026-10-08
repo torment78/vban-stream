@@ -38,7 +38,7 @@
   },
   "name": "obs-vban-audio",
   "displayName": "VBAN Stream",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "author": "VBAN Stream contributors",
   "website": "https://github.com/torment78/vban-stream",
   "email": ""

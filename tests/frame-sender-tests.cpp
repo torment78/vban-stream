@@ -4,6 +4,8 @@
 #include "frame-protocol.hpp"
 #include <QCoreApplication>
 #include <QImage>
+#include <QBuffer>
+#include <QImageWriter>
 #include <chrono>
 #include <cstring>
 #include <iostream>
@@ -13,7 +15,7 @@ using namespace vban;
 static void check(bool v,const char*m){if(!v)throw std::runtime_error(m);}
 static uint64_t now(){return uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());}
 struct Listener {
-    net::Socket socket=net::invalid;uint16_t port=0;
+    net::Socket socket=net::invalid;uint16_t port=0;QByteArray last_encoded;
     Listener(){socket=::socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);sockaddr_in a{};a.sin_family=AF_INET;a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
         check(!bind(socket,reinterpret_cast<sockaddr*>(&a),sizeof(a)),"Bind receiver");net::Length n=sizeof(a);getsockname(socket,reinterpret_cast<sockaddr*>(&a),&n);port=ntohs(a.sin_port);net::receive_buffer(socket);}
     ~Listener(){net::close(socket);}
@@ -29,7 +31,8 @@ struct Listener {
             check((uint16_t(packet[5])|(uint16_t(packet[6])<<8))==index++,"Ordered 16-bit packet indices");last_flags=packet[7];
             auto complete=assembler.push(packet.data(),size_t(n),now());
             if(complete){check(last_flags==(index==1?5:4),"Correct single/multiple-packet ending");if(multipart)check(index>255,"Large PNG crosses the 8-bit index boundary");
-                auto image=QImage::fromData(complete->data(),int(complete->size()));check(!image.isNull(),"Standard image decoder accepts complete output");return image;}
+                last_encoded=QByteArray(reinterpret_cast<const char*>(complete->data()),int(complete->size()));
+                auto image=QImage::fromData(last_encoded);check(!image.isNull(),"Standard image decoder accepts complete output");return image;}
         }throw std::runtime_error("No complete outgoing image");
     }
 };
@@ -73,6 +76,20 @@ int main(int argc,char**argv){try{
     route=sender.prepare(cfg,1280,720,error);check(bool(route),error.c_str());sender.activate(route);route.reset();
     sender.capture(noise.constBits(),uint32_t(noise.bytesPerLine()),7'000'000'000ULL);image=second.receive(4);wait_quality();
     check(sender.status().jpeg_quality==70,"Fixed JPEG preserves requested quality");sender.shutdown();
+    // Huffman optimization reduces JPEG traffic without changing decoded pixels.
+    // Compare the actual network payload with the unoptimized encoder at q100.
+    cfg.quality=100;
+    route=sender.prepare(cfg,320,180,error);check(bool(route),error.c_str());sender.activate(route);route.reset();
+    const auto detailed=noise.copy(0,0,320,180);
+    QByteArray plain;QBuffer buffer(&plain);check(buffer.open(QIODevice::WriteOnly),"Plain JPEG buffer");
+    QImageWriter writer(&buffer,"JPEG");writer.setQuality(100);writer.setOptimizedWrite(false);
+    check(writer.write(detailed),"Plain JPEG encode");
+    sender.capture(detailed.constBits(),uint32_t(detailed.bytesPerLine()),8'000'000'000ULL);image=second.receive(5);wait_quality();
+    const auto plain_image=QImage::fromData(plain);
+    check(!plain_image.isNull()&&image.convertToFormat(QImage::Format_RGB888)==plain_image.convertToFormat(QImage::Format_RGB888),
+        "Optimized JPEG100 preserves every decoded pixel");
+    check(second.last_encoded.size()<plain.size(),"Optimized JPEG100 uses fewer network bytes");
+    check(sender.status().jpeg_quality==100,"JPEG optimization keeps the requested quality100");sender.shutdown();
     // Exercise a worker stopping while entering its idle wait, including
     // prepared routes abandoned by a later validation failure.
     for(int attempt=0;attempt<64;++attempt){
@@ -80,5 +97,5 @@ int main(int argc,char**argv){try{
         if(attempt%2){sender.activate(route);route.reset();sender.shutdown();}else route.reset();
     }
     cfg.enabled=false;route=sender.prepare(cfg,0,0,error);sender.activate(route);sender.capture(noise.constBits(),uint32_t(noise.bytesPerLine()),now());check(net::readable(second.socket,20)==0,"Disabled route stays quiet");
-    std::cout<<"PASS: PNG/JPEG sender, byte order, rate gate, multi-packet framing, pacing, destination changes, bounded backlog, invalid configuration and shutdown.\n";return 0;
+    std::cout<<"PASS: PNG/JPEG sender, byte order, rate gate, multi-packet framing, pacing, destination changes, bounded backlog, lossless JPEG entropy optimization, invalid configuration and shutdown.\n";return 0;
 }catch(const std::exception&e){std::cerr<<"Frame sender test failed: "<<e.what()<<"\n";return 1;}}

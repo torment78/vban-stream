@@ -1,19 +1,7 @@
 name: macOS test build
 on:
   workflow_dispatch:
-  push:
-    branches: [dev]
-    paths:
-      - '.github/workflows/macos.yml'
-      - 'Build-Mac.sh'
-      - 'CMakeLists.txt'
-      - 'CMakePresets.json'
-      - 'buildspec.json'
-      - 'cmake/**'
-      - 'src/**'
-      - 'tests/**'
-      - 'tools/*macos*'
-      - 'docs/INSTALL-MAC.txt'
+  # Run manually once the Windows functionality is ready for Mac validation.
 permissions:
   contents: read
 jobs:

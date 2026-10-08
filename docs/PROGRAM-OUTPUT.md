@@ -1,4 +1,4 @@
-# OBS Program output in VBAN Stream 0.3.2
+# OBS Program output in VBAN Stream 0.3.3
 
 The third settings tab, **OBS to VBAN Frame**, sends the main OBS Program picture
 as JPEG or PNG over UDP. See the [setup instructions](../README.md#send-obs-program-to-vban-frame).
@@ -41,7 +41,10 @@ when too large. Minimum quality is 5 (or the configured ceiling if lower). Quali
 rises gradually when comfortably under budget. If an image still cannot fit, FPS
 may fall; this is not a guaranteed constant-rate codec. Fixed-quality mode uses
 the requested quality unchanged. PNG remains lossless, with faster compression.
-Both codecs run on the CPU. No GPU video codec is used.
+JPEG uses optimized Huffman tables to reduce the payload without changing its
+quantization or decoded pixels at the same quality setting. This remains a standard
+JPEG, not progressive JPEG or a new video codec. Both codecs run on the CPU.
+No GPU video codec is used.
 
 ## Wire protocol and pacing
 
@@ -59,8 +62,15 @@ continues across destination changes. No private image format or compression
 dependency is needed on the receiver beyond ordinary JPEG/PNG decoding.
 
 The network limit includes a conservative allowance for packet overhead.
-Transmission uses batches of at most 16 packets followed by interruptible pacing.
-The final batch is paced too. An image exceeding one second's network budget is
+Transmission uses batches of at most four packets followed by interruptible pacing.
+Each deadline starts at the actual preceding batch, so a delayed worker never pays
+back old scheduling debt by dumping catch-up bursts. Windows uses a cancellable
+high-resolution waitable timer for the bulk of the wait and a short yielding tail;
+macOS uses an interruptible condition-variable wait. Neither changes global timer
+resolution or audio worker priority. The final batch is paced too, followed by a
+2 ms gap to give receivers a brief opportunity to decode before the next image.
+This gap cannot compensate for every receiver's decode speed or socket capacity.
+An image exceeding one second's network budget is
 rejected before any packet is sent. Transmission also has a 1.5-second deadline,
 below the plugin receiver's two-second incomplete-image timeout. A failed send
 abandons that image and counts an error; the next image can recover.
@@ -89,6 +99,8 @@ or remote audio settings are changed.
   JPEG/PNG pixels, FPS gating, route changes, unavailable adapters, fragments above
   index 255, paced large PNGs, over-budget rejection without partial transmission,
   adaptive/fixed JPEG quality, measured status, bounded pending work and shutdown.
+  A quality-100 network payload is smaller than an unoptimized JPEG of the same
+  picture and produces exactly the same decoded RGB pixels.
 - `vban-frame-idle-bandwidth`: a static picture sends only periodic complete refreshes
   over three seconds, with the estimated wire rate below its cap.
 - `obs-dll-smoke`: the three settings tabs, nested mouse cards, disabled defaults
@@ -119,3 +131,30 @@ comparisons. A static 720p image fell from about 40 Mbps to around 1 Mbps.
 The automatic test asserts bounded idle traffic and recovery refreshes, not a
 hardware-specific moving-scene FPS threshold. Sustained performance and actual
 VBAN-Frame display smoothness must still be checked on the user's LAN.
+
+## 0.3.3 packet-loss reproduction
+
+`frame-performance --high-quality` sends a deliberately detailed 720p picture at
+fixed JPEG 100, with a changing marker, a 30 FPS capture request and an 84 Mbps cap.
+It repeats with 1 MiB, 64 KiB and 8 KiB receiver socket buffers. The final 8 KiB case
+only drains/reassembles packets, isolating transport from inline JPEG decoding.
+These are diagnostic runs, not hardware-dependent pass/fail FPS assertions.
+
+On the Windows development PC, the old 16-packet/catch-up sender completed 19 of
+19 sent pictures with a 1 MiB buffer but only 10 of 19 with 64 KiB and one of 19
+with 8 KiB. All reported zero local send errors. This reproduced the distinction
+between successful UDP writes and successfully received pictures without a LAN.
+
+The new pacing and optimized JPEG completed 19 of 19 with 64 KiB at about 60 Mbps,
+compared with about 83 Mbps before. With only 8 KiB and inline decoding, ten of 19
+still completed; draining without decoding completed all 19. A sufficiently small
+socket can still overflow while its receiving thread decodes. The deliberately
+complex quality-100 images remain too large for 30 FPS within the selected cap.
+
+The normal adaptive 720p/1080p runs retained about 29.7 FPS. Fixed ceiling 25 at
+1080p used about 54 Mbps, compared with about 64 Mbps in the earlier 0.3.2 run.
+These local measurements do not establish sustained VBAN-Screen behavior on the
+user's network; the new installer requires that separate reception test.
+
+Version 0.3.3 is a Windows-only test release. Mac builds run manually; the published
+Mac installer stays at 0.3.2 until the Windows functionality is settled.

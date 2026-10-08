@@ -36,7 +36,7 @@ public:
         if(!stop_ || !timer_) {
             if(stop_) CloseHandle(stop_);
             if(timer_) CloseHandle(timer_);
-            throw std::runtime_error("Cannot create monitor return worker timer.");
+            throw std::runtime_error("Cannot create worker scheduling timer.");
         }
     }
     ~WorkerWait() { CloseHandle(timer_); CloseHandle(stop_); }
@@ -44,10 +44,10 @@ public:
     void wait(int64_t nanoseconds) {
         LARGE_INTEGER due{}; due.QuadPart=-(nanoseconds/100);
         if(!SetWaitableTimer(timer_,&due,0,nullptr,nullptr,FALSE))
-            throw std::runtime_error("Monitor return scheduling timer failed.");
+            throw std::runtime_error("Worker scheduling timer failed.");
         const HANDLE handles[]{stop_,timer_};
         if(WaitForMultipleObjects(2,handles,FALSE,INFINITE)==WAIT_FAILED)
-            throw std::runtime_error("Monitor return worker wait failed.");
+            throw std::runtime_error("Worker timer wait failed.");
     }
 #else
     std::mutex mutex_;
