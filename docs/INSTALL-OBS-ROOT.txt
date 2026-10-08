@@ -1,9 +1,9 @@
-VBAN Stream 0.3.3 - Installation and usage
+VBAN Stream 0.3.4 - Installation and usage
 
 INSTALLER (STANDARD OR PORTABLE OBS)
 
 1. Close all OBS Studio windows.
-2. Run vban-stream-0.3.3-windows-x64-setup.exe.
+2. Run vban-stream-0.3.4-windows-x64-setup.exe.
    Approve the Windows administrator prompt. Protected folders such as
    Program Files need administrator access.
 3. Select one option:
@@ -35,10 +35,10 @@ The plugin works with normal and portable OBS Studio on Windows x64.
 Both ZIP files contain the same plugin DLL, arranged for different install paths.
 Install only one copy.
 
-- vban-stream-0.3.3-obs-root.zip:
+- vban-stream-0.3.4-obs-root.zip:
   Merge into the OBS installation folder. Works with normal AND portable OBS.
 
-- vban-stream-0.3.3-windows-x64.zip:
+- vban-stream-0.3.4-windows-x64.zip:
   Copy the obs-vban-audio folder into C:\ProgramData\obs-studio\plugins
   for a normal OBS installation.
 
@@ -337,8 +337,9 @@ Source stream selections are saved by OBS with the scene collection.
 
 VIDEO TRANSFER
 JPEG is compressed on the CPU. Quality 100 can produce large images, and each
-changing picture is sent as a complete JPEG. Version 0.3.3 reduces JPEG file size
-without lowering the selected quality and sends smaller packet bursts.
+changing picture is sent as a complete JPEG. Version 0.3.4 spaces individual
+packets across the frame interval to reduce bursts at the receiver. JPEG file-size optimization
+retains the selected quality. Check actual playback and errors on the receiver.
 Mbps means megabits per second: 80 Mbps is about 10 megabytes per second.
 Zero sender errors do not prove that the receiver received a complete picture.
 

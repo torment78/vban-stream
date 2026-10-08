@@ -162,3 +162,9 @@ if(BUILD_TESTING)
     set_target_properties(frame-performance PROPERTIES XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME NO)
   endif()
 endif()
+
+# Opt-in, read-only LAN diagnosis. No pictures are written and no live settings change.
+if(WIN32 AND BUILD_TESTING)
+  add_executable(frame-probe tools/frame-probe.cpp)
+  target_link_libraries(frame-probe PRIVATE vban-core Qt6::Core Qt6::Gui gdiplus shlwapi)
+endif()

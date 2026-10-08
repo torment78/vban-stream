@@ -1,4 +1,4 @@
-# OBS Program output in VBAN Stream 0.3.3
+# OBS Program output in VBAN Stream 0.3.4
 
 The third settings tab, **OBS to VBAN Frame**, sends the main OBS Program picture
 as JPEG or PNG over UDP. See the [setup instructions](../README.md#send-obs-program-to-vban-frame).
@@ -62,13 +62,18 @@ continues across destination changes. No private image format or compression
 dependency is needed on the receiver beyond ordinary JPEG/PNG decoding.
 
 The network limit includes a conservative allowance for packet overhead.
-Transmission uses batches of at most four packets followed by interruptible pacing.
-Each deadline starts at the actual preceding batch, so a delayed worker never pays
-back old scheduling debt by dumping catch-up bursts. Windows uses a cancellable
-high-resolution waitable timer for the bulk of the wait and a short yielding tail;
-macOS uses an interruptible condition-variable wait. Neither changes global timer
-resolution or audio worker priority. The final batch is paced too, followed by a
-2 ms gap to give receivers a brief opportunity to decode before the next image.
+Transmission paces each individual packet from the preceding packet's completed socket
+write, so a delayed worker never dumps catch-up bursts. Each picture is spread over
+at least 85% of its configured frame interval; larger pictures take longer to obey
+the bandwidth cap. The final packet is paced too, followed by a decode gap of
+one eighth of the image wire time at that cap, clamped to 2–25 ms. Larger images
+therefore leave more time for receivers that decode on their UDP-reading thread.
+Windows uses a cancellable high-resolution waitable timer for waits over 1 ms,
+then yields through the remaining sub-millisecond interval. This avoids rounding
+every short packet wait up and lowering FPS; the precision tail costs video-worker
+CPU time. macOS uses an interruptible condition-variable wait, but this release is
+built and tested on Windows only. Neither changes global timer resolution or audio
+worker priority.
 This gap cannot compensate for every receiver's decode speed or socket capacity.
 An image exceeding one second's network budget is
 rejected before any packet is sent. Transmission also has a 1.5-second deadline,
@@ -158,3 +163,40 @@ user's network; the new installer requires that separate reception test.
 
 Version 0.3.3 is a Windows-only test release. Mac builds run manually; the published
 Mac installer stays at 0.3.2 until the Windows functionality is settled.
+
+## 0.3.4 LAN packet-order diagnosis
+
+A 20-second capture of the reported 720p/JPEG-40 stream received about 11.35 Mbps.
+The same packet stream was fed to the plugin's strict in-order assembler and a
+separate diagnostic assembler that sorts fragment indices. The strict path
+completed 204 pictures (10.2 FPS); sorting completed 571 (28.5 FPS). There were
+1,597 nonconsecutive arrival transitions, including `19,16,17,18` within a burst.
+All 571 reconstructed images decoded in both Qt and Windows GDI+, with no decode
+errors or decoder-queue drops. The mean combined decoding time was about 5.1 ms.
+
+These results identify packet ordering as a concrete failure on the tested path.
+They do not identify whether the sender host, a NIC/driver, the network, or the
+receiving host reordered the traffic, nor establish VBAN-Screen's internal behavior.
+The diagnostic assembler closes at the end fragment, so its incomplete count can
+include late packets; it is not proof that every such packet was lost on the wire.
+
+Version 0.3.4 replaces four-packet bursts with individual-packet spacing. Local
+moving 720p/1080p checks delivered 29.3-29.7 FPS with no incomplete pictures; this
+is a candidate mitigation, not confirmation of a fix on the LAN. Repeat the
+VBAN-Screen playback/error check with the new Windows installer before promotion.
+
+The optional Windows `frame-probe <port> <seconds> <sender-ip>` build target listens
+on an exclusive UDP port for at most 60 seconds. Close other listeners using that
+port first. It records counters, sampled header bytes and fragment arrival indices,
+never pictures, and changes no firewall or routing settings. The probe compares
+strict/sorted assembly and Qt/GDI+ decoding. It is a developer tool, not part of
+the installer. Read source and destination addresses in the correct direction.
+
+The large-image pause was checked against the fixed-quality-100 diagnostic too.
+With individual spacing but only a 2 ms gap, a 64 KiB receiver completed 13 of 24
+sent pictures. With the bounded size-dependent gap it completed 21 of 21; the
+8 KiB inline-decoding receiver also completed 21 of 21. This is one local run,
+not a guaranteed minimum receiver-buffer size. Those detailed JPEG-100 images
+still used about 70 Mbps at only 7 FPS because each image is roughly a megabyte.
+The normal adaptive 720p/1080p tests remained at 29.3–29.7 FPS with no incomplete
+pictures. Fixed JPEG 100 is not a substitute for an inter-frame video codec.

@@ -92,9 +92,10 @@ struct FrameSender::Session {
             if(left<=0)return;
 #ifdef _WIN32
             // Windows rounds short timer waits. Block for the bulk of a wait,
-            // then yield for at most 200 us rather than rounding each burst to
-            // a whole millisecond. This is only the video transmitter thread.
-            if(left>250'000)pacing_wait.wait(left-200'000);
+            // then yield for the final sub-millisecond interval rather than
+            // rounding every packet interval up. This only runs on the video
+            // transmitter thread; longer waits remain cancellable and blocking.
+            if(left>1'000'000)pacing_wait.wait(left-750'000);
             else std::this_thread::yield();
 #else
             pacing_wait.wait(left);
@@ -116,17 +117,20 @@ struct FrameSender::Session {
         std::memcpy(packet.data()+8,config.stream_name.data(),config.stream_name.size());
         const auto frame=sequence->fetch_add(1);
         for (unsigned i=0;i<4;++i) packet[24+i]=uint8_t(frame>>(8*i));
-        const auto began=Clock::now(); auto batch_began=began;uint64_t sent=0,batch_bytes=0;
+        // Spread a small image over most of its frame interval instead of sending
+        // it in a short burst at the maximum configured link rate. Larger images
+        // still obey that rate limit, even if this reduces their delivered FPS.
+        const auto transfer_duration=wire_bytes*8'000'000'000ULL/bit_rate;
+        const auto image_duration=std::max(transfer_duration,850'000'000ULL/uint64_t(config.fps));
+        const auto began=Clock::now();auto previous_packet=began;uint64_t sent=0,previous_bytes=0;
         for (size_t index=0;index<count;++index) {
             if (stop) return false;
-            // Four datagrams fit in a small receive buffer. Pace from the actual
-            // previous burst, never from the beginning of the image: a late wake
-            // must not cause several "catch-up" bursts to be dumped at once.
-            if (index%4==0 && index) {
-                const auto deadline=batch_began+std::chrono::nanoseconds(batch_bytes*8'000'000'000ULL/bit_rate);
-                pace_until(deadline);
+            // Pace every datagram from its actual predecessor. The LAN test
+            // showed reordering even inside a four-packet burst. Never catch up
+            // after a delayed wake by writing several packets back-to-back.
+            if (index) {
+                pace_until(previous_packet+std::chrono::nanoseconds(previous_bytes*image_duration/wire_bytes));
                 if(stop)return false;
-                batch_began=Clock::now();batch_bytes=0;
             }
             if (Clock::now()-began>std::chrono::milliseconds(1500)) { ++dropped; fail("Video sender missed its network deadline."); return false; }
             const size_t offset=index*1436, length=std::min(size_t(1436),size_t(encoded.size())-offset);
@@ -138,16 +142,20 @@ struct FrameSender::Session {
             if (::send(socket,reinterpret_cast<const char*>(packet.data()),size,0)!=size) {
                 ++dropped;fail("Video UDP send failed (socket "+std::to_string(net::error())+").");return false;
             }
-            ++packets;bytes+=uint64_t(size);sent+=uint64_t(size)+66;batch_bytes+=uint64_t(size)+66;
+            previous_packet=Clock::now();
+            ++packets;bytes+=uint64_t(size);previous_bytes=uint64_t(size)+66;sent+=previous_bytes;
         }
         ++frames;const auto completed=clock_ns();sent_at=completed;
         age_ns=completed-captured;
         { std::lock_guard lock(mutex);error.clear();marks[mark_index++%marks.size()]={completed,sent}; }
-        // Pace the final burst too, then leave a short gap for receivers that
+        // Pace the final packet too, then leave a short gap for receivers that
         // decode a completed JPEG on the same thread that drains their socket.
-        const auto deadline=batch_began+std::chrono::nanoseconds(batch_bytes*8'000'000'000ULL/bit_rate);
+        const auto deadline=previous_packet+std::chrono::nanoseconds(previous_bytes*image_duration/wire_bytes);
         pace_until(deadline);
-        if(!stop)pacing_wait.wait(2'000'000);
+        // Large JPEGs take longer to decode. Reserve a bounded extra interval
+        // before the next image so inline decoders can resume draining UDP.
+        const auto decode_gap=std::clamp(transfer_duration/8,2'000'000ULL,25'000'000ULL);
+        if(!stop)pacing_wait.wait(int64_t(decode_gap));
         send_ns=uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now()-began).count());
         return true;
     }
