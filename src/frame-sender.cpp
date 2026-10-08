@@ -90,12 +90,17 @@ struct FrameSender::Session {
         while(!stop) {
             const auto left=std::chrono::duration_cast<std::chrono::nanoseconds>(deadline-Clock::now()).count();
             if(left<=0)return;
-            // Both platforms can overshoot very short timer/condition waits.
-            // Block for longer waits, then yield through the final sub-millisecond
-            // interval on this video thread. Otherwise per-packet rounding can
-            // push a large image past its assembly deadline on macOS.
+            // Block for longer waits, then finish a bounded precision tail on
+            // this video worker. macOS yielding can itself defer the worker too
+            // long for sub-millisecond packet intervals; do not yield there.
             if(left>1'000'000)pacing_wait.wait(left-750'000);
-            else std::this_thread::yield();
+            else {
+#ifdef _WIN32
+                std::this_thread::yield();
+#else
+                std::atomic_signal_fence(std::memory_order_seq_cst);
+#endif
+            }
         }
     }
     bool send_image(const QByteArray &encoded, uint64_t captured) {

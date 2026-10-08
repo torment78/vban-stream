@@ -15,8 +15,8 @@ using namespace vban;
 static void check(bool v,const char*m){if(!v)throw std::runtime_error(m);}
 static uint64_t now(){return uint64_t(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());}
 struct Listener {
-    net::Socket socket=net::invalid;uint16_t port=0;QByteArray last_encoded;
-    Listener(){socket=::socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);sockaddr_in a{};a.sin_family=AF_INET;a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
+    net::Socket socket=net::invalid;uint16_t port=0;QByteArray last_encoded;FrameSender &sender;
+    explicit Listener(FrameSender &s):sender(s){socket=::socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);sockaddr_in a{};a.sin_family=AF_INET;a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
         check(!bind(socket,reinterpret_cast<sockaddr*>(&a),sizeof(a)),"Bind receiver");net::Length n=sizeof(a);getsockname(socket,reinterpret_cast<sockaddr*>(&a),&n);port=ntohs(a.sin_port);net::receive_buffer(socket);}
     ~Listener(){net::close(socket);}
     QImage receive(uint32_t expected,bool multipart=false){
@@ -33,11 +33,11 @@ struct Listener {
             if(complete){check(last_flags==(index==1?5:4),"Correct single/multiple-packet ending");if(multipart)check(index>255,"Large PNG crosses the 8-bit index boundary");
                 last_encoded=QByteArray(reinterpret_cast<const char*>(complete->data()),int(complete->size()));
                 auto image=QImage::fromData(last_encoded);check(!image.isNull(),"Standard image decoder accepts complete output");return image;}
-        }throw std::runtime_error("No complete outgoing image: frame "+std::to_string(expected)+", received fragments "+std::to_string(index)+", last flags "+std::to_string(last_flags));
+        }throw std::runtime_error("No complete outgoing image: frame "+std::to_string(expected)+", received fragments "+std::to_string(index)+", last flags "+std::to_string(last_flags)+", sent packets "+std::to_string(sender.status().packets)+", sender error: "+sender.status().error);
     }
 };
 int main(int argc,char**argv){try{
-    QCoreApplication app(argc,argv);FrameSender sender;Listener first,second;
+    QCoreApplication app(argc,argv);FrameSender sender;Listener first(sender),second(sender);
     FrameOutputConfig cfg;cfg.enabled=true;cfg.destination_ip="127.0.0.1";cfg.port=first.port;cfg.format="PNG";
     std::string error;auto route=sender.prepare(cfg,320,180,error);check(bool(route),error.c_str());
     check(FrameSender::dimensions(route)==std::pair{320,180},"Smaller images are not enlarged");
