@@ -218,6 +218,9 @@ int main(int argc,char **argv) {
         tabs->setCurrentIndex(2);app.processEvents();dialog->grab().save(root+"/program-output-settings-dialog.png");
         auto *output_enabled=dialog->findChild<QCheckBox *>("frame_output_enabled");
         check(output_enabled && !output_enabled->isChecked(),"Program output is disabled for old settings");
+        auto *adaptive=dialog->findChild<QCheckBox *>("frame_output_adaptive");
+        check(adaptive && adaptive->isChecked(),"Adaptive JPEG is available and enabled by default");
+        check(saved.value("frame_output").toObject().value("adaptive_jpeg").toBool(),"Adaptive JPEG setting persists");
         check(!saved.value("frame_output").toObject().value("enabled").toBool(),"Disabled Program output persists safely");
         tabs->setCurrentIndex(0);obs_source_release(video_source);
         const int before=a.count;

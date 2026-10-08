@@ -1,4 +1,4 @@
-VBAN STREAM 0.3.1 - MAC TEST BUILD
+VBAN STREAM 0.3.2 - MAC TEST BUILD
 by ElkaSoft
 
 REQUIREMENTS
@@ -8,7 +8,7 @@ This is a test release. A real OBS session and sustained LAN audio test are requ
 
 INSTALL WITH THE PKG
 1. Quit OBS Studio.
-2. Open vban-stream-0.3.1-macos-universal-test.pkg and follow the installer.
+2. Open vban-stream-0.3.2-macos-universal-test.pkg and follow the installer.
 3. Install for your current user. The plugin goes here:
    ~/Library/Application Support/obs-studio/plugins/obs-vban-audio.plugin
 4. Restart OBS. Open Tools > VBAN Stream Settings.
@@ -116,7 +116,8 @@ SEND OBS PROGRAM TO VBAN FRAME
 2. Enable Send OBS Program. Enter the receiving computer's IPv4 address,
    UDP listen port and exact incoming video stream name.
 3. Select this OBS computer's LAN adapter if needed. Start with JPEG,
-   a 1280 x 720 resolution limit, 15 fps, quality 80 and 24 Mbps.
+   a 1280 x 720 resolution limit, 15 fps, quality limit 80 and 24 Mbps.
+   Leave Adapt JPEG quality to maintain frame rate checked initially.
 4. Click Apply. In VBAN-Screen or another VBAN-Frame receiver, match the
    OBS sender IP, video stream name and UDP port.
 
@@ -124,16 +125,26 @@ The output follows live Program, including scene changes and transitions.
 Studio Mode is optional for video sending. The OBS interface, Preview and
 audio are not included. Use a separate monitor return for sound.
 The resolution limit preserves aspect ratio and never enlarges the image.
-PNG is lossless but can require more bandwidth. FPS and network limits are
-maximums; large images or a busy computer can reduce the actual frame rate.
+Adaptive JPEG lowers quality when needed to fit the FPS and network limit.
+The quality setting is its maximum; uncheck adaptation to keep fixed quality.
+For lower traffic, try 12 or 6 Mbps, then lower resolution or FPS if too soft.
+The network limit is this stream's budget, not the speed of your LAN.
+Static pictures use a cached refresh roughly once per second.
+
+JPEG and PNG encoding use the CPU. PNG stays lossless but is larger and slower
+for detailed moving pictures; JPEG is the better starting point for motion.
+FPS is an upper limit. Encoding, image size and receiver speed affect actual FPS.
 Queued old pictures are skipped to avoid a growing delay.
 
 Output is disabled initially and currently requires SDR video in OBS.
 Disable it and click Apply before changing OBS video settings or profiles.
-Sending and the frame counter report outgoing UDP, not remote reception.
-Hover over status for packet, byte and error counts. Reduce resolution,
-FPS or JPEG quality if frames are repeatedly skipped. An image-budget error
-means use JPEG, lower resolution or a higher network limit if your LAN allows it.
+Live status shows measured outgoing FPS, estimated Mbps including packet overhead,
+and the actual JPEG quality. Low FPS is normal for a still picture. Hover for
+encode time, send time, capture-to-send age and error counters. These measure local
+work; Sending does not confirm remote reception or display. Compare with the
+receiver when motion looks slow. Reduce resolution, FPS or fixed JPEG quality if
+frames are repeatedly skipped. For an image-budget error, use JPEG, lower
+resolution or a higher network limit if your LAN allows it.
 Avoid including the received copy in the same outgoing Program scene.
 
 TEST CHECKLIST

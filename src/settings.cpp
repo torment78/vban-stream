@@ -74,6 +74,7 @@ Config read_config(std::string &error) {
     o.local_ip = out.value("local_ip").toString().toStdString();
     o.stream_name = out.value("stream_name").toString("OBS-PROGRAM").toStdString();
     o.format = out.value("format").toString("JPEG").toStdString();
+    o.adaptive_jpeg = out.value("adaptive_jpeg").toBool(true);
     const int output_port = out.value("port").toInt(6980); o.port = uint16_t(output_port > 0 && output_port <= 65535 ? output_port : 0);
     o.max_width = out.value("max_width").toInt(1280); o.max_height = out.value("max_height").toInt(720);
     o.fps = out.value("fps").toInt(15); o.quality = out.value("quality").toInt(80); o.mbps = out.value("mbps").toInt(24);
@@ -128,7 +129,7 @@ bool write_config(const Config &cfg, std::string &error) {
     const auto &o = cfg.frame_output;
     const QJsonObject output{{"enabled",o.enabled},{"destination_ip",QString::fromStdString(o.destination_ip)},
         {"local_ip",QString::fromStdString(o.local_ip)},{"port",o.port},{"stream_name",QString::fromStdString(o.stream_name)},
-        {"format",QString::fromStdString(o.format)},{"max_width",o.max_width},{"max_height",o.max_height},
+        {"format",QString::fromStdString(o.format)},{"adaptive_jpeg",o.adaptive_jpeg},{"max_width",o.max_width},{"max_height",o.max_height},
         {"fps",o.fps},{"quality",o.quality},{"mbps",o.mbps}};
     const QJsonDocument doc(QJsonObject{
         {"version", 1}, {"common_ip", cfg.common_ip}, {"sender_ip", QString::fromStdString(cfg.sender_ip)},
@@ -423,20 +424,22 @@ public:
         const auto resolution_index=output_resolution_->findData(o.max_width);output_resolution_->setCurrentIndex(resolution_index<0?1:resolution_index);
         output_fps_ = new QSpinBox(output_box);output_fps_->setObjectName("frame_output_fps");output_fps_->setRange(1,30);output_fps_->setSuffix(" fps");output_fps_->setValue(o.fps);
         output_quality_ = new QSpinBox(output_box);output_quality_->setObjectName("frame_output_quality");output_quality_->setRange(1,100);output_quality_->setValue(o.quality);
+        output_adaptive_ = new QCheckBox("Adapt JPEG quality to maintain frame rate",output_box);output_adaptive_->setObjectName("frame_output_adaptive");output_adaptive_->setChecked(o.adaptive_jpeg);
         output_limit_ = new QComboBox(output_box);output_limit_->setObjectName("frame_output_limit");
-        for(int rate:{12,24,48,84})output_limit_->addItem(QString("%1 Mbps").arg(rate),rate);
-        const auto rate_index=output_limit_->findData(o.mbps);output_limit_->setCurrentIndex(rate_index<0?1:rate_index);
+        for(int rate:{6,12,24,48,84})output_limit_->addItem(QString("%1 Mbps").arg(rate),rate);
+        const auto rate_index=output_limit_->findData(o.mbps);output_limit_->setCurrentIndex(rate_index<0?2:rate_index);
         output_status_ = new QLabel(output_box);output_status_->setObjectName("frame_output_status");output_status_->setWordWrap(true);output_status_->setTextFormat(Qt::PlainText);
         output_fields->addRow(output_enabled_);output_fields->addRow("Send from this PC",output_local_);
         output_fields->addRow("Destination IPv4",output_ips_);output_fields->addRow("UDP port",output_port_);output_fields->addRow("VBAN stream name",output_name_);
         output_fields->addRow("Image format",output_format_);output_fields->addRow("Resolution limit",output_resolution_);output_fields->addRow("Maximum frame rate",output_fps_);
-        output_fields->addRow("JPEG quality",output_quality_);output_fields->addRow("Network limit",output_limit_);output_fields->addRow("Live status",output_status_);
+        output_fields->addRow("JPEG quality limit",output_quality_);output_fields->addRow(output_adaptive_);output_fields->addRow("Network limit",output_limit_);output_fields->addRow("Live status",output_status_);
         output_layout->addWidget(output_box);
-        connect(output_format_,&QComboBox::currentTextChanged,this,[this](const QString &format){output_quality_->setEnabled(format=="JPEG");});
-        output_quality_->setEnabled(o.format=="JPEG");
+        connect(output_format_,&QComboBox::currentTextChanged,this,[this](const QString &format){output_quality_->setEnabled(format=="JPEG");output_adaptive_->setEnabled(format=="JPEG");});
+        output_quality_->setEnabled(o.format=="JPEG");output_adaptive_->setEnabled(o.format=="JPEG");
         auto *output_note = new QLabel("On the receiver, match this OBS computer's sender IP, the UDP port and stream name. "
             "Start with JPEG, 1280 x 720 and 15 fps. Aspect ratio is preserved and smaller pictures are not enlarged. "
-            "PNG is lossless and can need more bandwidth. Skipped frames mean encoding or sending could not keep up; lower the resolution or frame rate. "
+            "Adaptive JPEG lowers quality when needed to fit the FPS and network limit; uncheck it for fixed quality. "
+            "Still pictures use periodic refreshes. Live status shows measured output. PNG is lossless and slower; use JPEG for motion. "
             "Video only: use the audio returns separately. SDR output is supported. Disable Send OBS Program before changing OBS video settings. "
             "Sending confirms local UDP writes, not reception on the other computer.", output_page);
         output_note->setWordWrap(true);output_layout->addWidget(output_note);output_layout->addStretch();
@@ -467,11 +470,16 @@ private:
     void refresh() {
         const auto out = output_->status();
         QString output_text = !out.enabled ? "Disabled" : out.sending ? "Sending" : "Waiting for Program";
-        if(out.enabled) output_text += QString(" | %1 x %2 | Frames: %3 | Skipped: %4 | Errors: %5 | From: %6")
-            .arg(out.width).arg(out.height).arg(out.frames).arg(out.dropped).arg(out.errors).arg(QString::fromStdString(out.local_ip));
+        if(out.enabled) {
+            output_text += QString(" | %1 x %2 | %3 fps | %4 Mbps").arg(out.width).arg(out.height).arg(out.fps,0,'f',1).arg(out.mbps,0,'f',1);
+            if(out.jpeg_quality) output_text += QString(" | JPEG quality %1").arg(out.jpeg_quality);
+            output_text += QString("\nFrames: %1 | Skipped: %2 | Errors: %3 | From: %4")
+                .arg(out.frames).arg(out.dropped).arg(out.errors).arg(QString::fromStdString(out.local_ip));
+        }
         if(!out.error.empty()) output_text += " | " + QString::fromStdString(out.error);
         output_status_->setText(output_text);
-        output_status_->setToolTip(QString("Sent packets: %1\nSent bytes: %2").arg(out.packets).arg(out.bytes));
+        output_status_->setToolTip(QString("Sent packets: %1\nSent bytes: %2\nUnchanged pictures suppressed: %3\nLast encode: %4 ms\nLast send (with pacing): %5 ms\nLast capture to sent: %6 ms\nRates describe the last second and include estimated packet overhead. Receiver display time is not measured.")
+            .arg(out.packets).arg(out.bytes).arg(out.unchanged).arg(out.encode_ms,0,'f',1).arg(out.send_ms,0,'f',1).arg(out.age_ms,0,'f',1));
         mouse_hint_->setText(control_ ? QString::fromStdString(control_->availability()) : "Program control is unavailable.");
         for (size_t i = 0; i < video_slot_count; ++i) {
             const auto s = mouse_->status(i);
@@ -540,7 +548,7 @@ private:
         o.local_ip=output_local_->currentData().toString().toStdString();o.port=static_cast<uint16_t>(output_port_->value());
         o.stream_name=output_name_->text().toStdString();o.format=output_format_->currentText().toStdString();
         o.max_width=output_resolution_->currentData().toInt();o.max_height=o.max_width*9/16;
-        o.fps=output_fps_->value();o.quality=output_quality_->value();o.mbps=output_limit_->currentData().toInt();
+        o.adaptive_jpeg=output_adaptive_->isChecked();o.fps=output_fps_->value();o.quality=output_quality_->value();o.mbps=output_limit_->currentData().toInt();
         cfg.mouse_local_ip = mouse_local_->currentData().toString().toStdString();
         for (size_t i = 0; i < video_slot_count; ++i) cfg.mice[i] = {
             mouse_enabled_[i]->isChecked(), mouse_ips_[i]->text().trimmed().toStdString(),
@@ -575,7 +583,7 @@ private:
     std::shared_ptr<MouseReturn> mouse_;
     ProgramMouse *control_ = nullptr;
     std::shared_ptr<ProgramOutput> output_;
-    QCheckBox *output_enabled_{};
+    QCheckBox *output_enabled_{}, *output_adaptive_{};
     QLineEdit *output_ips_{}, *output_name_{};
     QComboBox *output_local_{}, *output_format_{}, *output_resolution_{}, *output_limit_{};
     QSpinBox *output_port_{}, *output_fps_{}, *output_quality_{};

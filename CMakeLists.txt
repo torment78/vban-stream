@@ -152,3 +152,13 @@ if(WIN32 AND BUILD_TESTING AND EXISTS "${CMAKE_SOURCE_DIR}/.deps/obs-api-32.2.1/
   target_link_libraries(obs-video-smoke32 PRIVATE OBS::libobs OBS::obs-frontend-api Qt6::Core Qt6::Widgets vban-core)
   add_dependencies(obs-video-smoke32 ${CMAKE_PROJECT_NAME})
 endif()
+
+if(BUILD_TESTING)
+  add_executable(frame-performance tests/frame-performance.cpp)
+  target_link_libraries(frame-performance PRIVATE vban-video)
+  add_test(NAME vban-frame-idle-bandwidth COMMAND frame-performance --check-static)
+  set_tests_properties(vban-frame-idle-bandwidth PROPERTIES TIMEOUT 20)
+  if(APPLE)
+    set_target_properties(frame-performance PROPERTIES XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME NO)
+  endif()
+endif()

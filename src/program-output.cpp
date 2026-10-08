@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "program-output.hpp"
+#include <algorithm>
 namespace vban {
 ProgramOutput::~ProgramOutput() { shutdown(); }
 ProgramOutput::Prepared ProgramOutput::prepare(const FrameOutputConfig &cfg,std::string &error) {
@@ -13,11 +14,16 @@ ProgramOutput::Prepared ProgramOutput::prepare(const FrameOutputConfig &cfg,std:
     return sender_.prepare(cfg,info.output_width,info.output_height,error);
 }
 void ProgramOutput::activate(Prepared next) {
-    shutdown();const auto [width,height]=FrameSender::dimensions(next);sender_.activate(std::move(next));
+    shutdown();const auto [width,height]=FrameSender::dimensions(next);const auto fps=FrameSender::frame_rate(next);sender_.activate(std::move(next));
     if(width&&height) {
         video_scale_info conversion{};conversion.format=VIDEO_FORMAT_RGBA;conversion.width=uint32_t(width);conversion.height=uint32_t(height);
         conversion.range=VIDEO_RANGE_FULL;conversion.colorspace=VIDEO_CS_SRGB;
-        obs_add_raw_video_callback(&conversion,capture,this);connected_=true;
+        obs_video_info info{};uint32_t divisor=1;
+        if(obs_get_video_info(&info) && info.fps_den)
+            divisor=uint32_t(std::max(uint64_t(1),uint64_t(info.fps_num)/(uint64_t(info.fps_den)*uint64_t(fps))));
+        // OBS skips before scaling/conversion; filtering only inside capture would
+        // still convert every 60/120-Hz Program frame on the CPU.
+        obs_add_raw_video_callback2(&conversion,divisor,capture,this);connected_=true;
     }
 }
 void ProgramOutput::shutdown() {

@@ -11,7 +11,7 @@ import sys
 import tarfile
 
 ROOT=Path(__file__).resolve().parents[1]
-TESTS=("vban-tests","return-tests","video-tests","frame-sender-tests","mouse-tests","mouse-scene-tests","obs-smoke","obs-return-smoke","obs-multichannel")
+TESTS=("vban-tests","return-tests","video-tests","frame-sender-tests","frame-performance","mouse-tests","mouse-scene-tests","obs-smoke","obs-return-smoke","obs-multichannel")
 
 def run(*args,**kwargs):
     return subprocess.run([str(a) for a in args],check=True,**kwargs)
@@ -71,13 +71,14 @@ def validate():
         host=ROOT/"build_macos/Release"/name
         for channels in (range(1,9) if name=="obs-multichannel" else [None]):
             args=[host]
+            if name=="frame-performance": args.append("--check-static")
             suffix=name+("-"+str(channels) if channels else "")
             if name.startswith("obs-"):
                 args += [executable,bundle/"Contents/Resources",target/(suffix+"-config")]
             if channels: args.append(str(channels))
             with (target/(suffix+".log")).open("w") as log:
                 run(*args,env=env,stdout=log,stderr=subprocess.STDOUT,timeout=120)
-    (target/"RESULT.txt").write_text("PASS on "+platform.machine()+": released ZIP hashes, universal slices, bundle signature, UDP receive/return tests, OBS host loading/UI tests, monitor returns, incoming channels 1-8 in PCM16/24.\n")
+    (target/"RESULT.txt").write_text("PASS on "+platform.machine()+": released ZIP hashes, universal slices, bundle signature, UDP receive/return/video tests, idle video bandwidth, OBS host loading/UI tests, monitor returns, incoming channels 1-8 in PCM16/24.\n")
     print((target/"RESULT.txt").read_text())
 
 if __name__=="__main__":

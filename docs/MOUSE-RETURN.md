@@ -1,4 +1,4 @@
-# Mouse return in VBAN Stream 0.3.1
+# Mouse return in VBAN Stream 0.3.2
 
 Mouse return links each of the two video inputs to a VBAN-TEXT destination.
 It controls VoiceMeeter's App View from the Studio Mode Program pane in OBS.

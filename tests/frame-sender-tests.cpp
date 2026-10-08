@@ -62,6 +62,17 @@ int main(int argc,char**argv){try{
     check(sender.status().errors>0&&sender.status().dropped>0,"Over-budget PNG and queued replacement are counted");
     check(net::readable(second.socket,20)==0,"Oversized image sends no incomplete burst");
     sender.shutdown();check(!sender.status().enabled,"Shutdown disables capture and joins encoding worker");
+    // Adaptive JPEG must fit a per-frame budget, while fixed quality remains explicit.
+    cfg.mbps=24;cfg.format="JPEG";cfg.fps=30;cfg.quality=80;cfg.adaptive_jpeg=true;
+    route=sender.prepare(cfg,1280,720,error);check(bool(route),error.c_str());sender.activate(route);route.reset();
+    sender.capture(noise.constBits(),uint32_t(noise.bytesPerLine()),6'000'000'000ULL);image=second.receive(3);
+    auto wait_quality=[&]{const auto end=now()+1'000'000'000ULL;while(!sender.status().jpeg_quality&&now()<end)std::this_thread::sleep_for(std::chrono::milliseconds(2));};
+    wait_quality();check(sender.status().jpeg_quality>0&&sender.status().jpeg_quality<80,"Adaptive JPEG reports reduced actual quality");
+    check(sender.status().fps>0&&sender.status().mbps>0&&sender.status().encode_ms>0,"Measured output diagnostics available");
+    cfg.adaptive_jpeg=false;cfg.quality=70;
+    route=sender.prepare(cfg,1280,720,error);check(bool(route),error.c_str());sender.activate(route);route.reset();
+    sender.capture(noise.constBits(),uint32_t(noise.bytesPerLine()),7'000'000'000ULL);image=second.receive(4);wait_quality();
+    check(sender.status().jpeg_quality==70,"Fixed JPEG preserves requested quality");sender.shutdown();
     // Exercise a worker stopping while entering its idle wait, including
     // prepared routes abandoned by a later validation failure.
     for(int attempt=0;attempt<64;++attempt){

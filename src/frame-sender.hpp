@@ -8,7 +8,9 @@ namespace vban {
 struct FrameOutputStatus {
     bool enabled = false, sending = false;
     int width = 0, height = 0;
-    uint64_t frames = 0, packets = 0, bytes = 0, dropped = 0, errors = 0;
+    uint64_t frames = 0, packets = 0, bytes = 0, dropped = 0, errors = 0, unchanged = 0;
+    double fps = 0, mbps = 0, encode_ms = 0, send_ms = 0, age_ms = 0;
+    int jpeg_quality = 0;
     std::string local_ip, error;
 };
 class FrameSender {
@@ -23,6 +25,7 @@ public:
     void shutdown();
     void capture(const uint8_t *rgba, uint32_t stride, uint64_t timestamp) noexcept;
     FrameOutputStatus status() const;
+    static int frame_rate(const Prepared &);
     static std::pair<int,int> dimensions(const Prepared &);
 private:
     Prepared active_;
