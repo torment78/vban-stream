@@ -33,7 +33,7 @@ struct Listener {
             if(complete){check(last_flags==(index==1?5:4),"Correct single/multiple-packet ending");if(multipart)check(index>255,"Large PNG crosses the 8-bit index boundary");
                 last_encoded=QByteArray(reinterpret_cast<const char*>(complete->data()),int(complete->size()));
                 auto image=QImage::fromData(last_encoded);check(!image.isNull(),"Standard image decoder accepts complete output");return image;}
-        }throw std::runtime_error("No complete outgoing image");
+        }throw std::runtime_error("No complete outgoing image: frame "+std::to_string(expected)+", received fragments "+std::to_string(index)+", last flags "+std::to_string(last_flags));
     }
 };
 int main(int argc,char**argv){try{

@@ -90,16 +90,12 @@ struct FrameSender::Session {
         while(!stop) {
             const auto left=std::chrono::duration_cast<std::chrono::nanoseconds>(deadline-Clock::now()).count();
             if(left<=0)return;
-#ifdef _WIN32
-            // Windows rounds short timer waits. Block for the bulk of a wait,
-            // then yield for the final sub-millisecond interval rather than
-            // rounding every packet interval up. This only runs on the video
-            // transmitter thread; longer waits remain cancellable and blocking.
+            // Both platforms can overshoot very short timer/condition waits.
+            // Block for longer waits, then yield through the final sub-millisecond
+            // interval on this video thread. Otherwise per-packet rounding can
+            // push a large image past its assembly deadline on macOS.
             if(left>1'000'000)pacing_wait.wait(left-750'000);
             else std::this_thread::yield();
-#else
-            pacing_wait.wait(left);
-#endif
         }
     }
     bool send_image(const QByteArray &encoded, uint64_t captured) {

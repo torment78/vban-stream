@@ -71,7 +71,9 @@ therefore leave more time for receivers that decode on their UDP-reading thread.
 Windows uses a cancellable high-resolution waitable timer for waits over 1 ms,
 then yields through the remaining sub-millisecond interval. This avoids rounding
 every short packet wait up and lowering FPS; the precision tail costs video-worker
-CPU time. macOS uses an interruptible condition-variable wait. Version 0.3.5 also rebuilds
+CPU time. macOS uses an interruptible condition-variable wait for the bulk of longer waits
+and the same short yielding tail. A native large-PNG test exposed excessive
+per-packet wait rounding without that tail. Version 0.3.5 also rebuilds
 the universal Mac package; native Mac playback still requires a live test. Neither changes global timer resolution or audio
 worker priority.
 This gap cannot compensate for every receiver's decode speed or socket capacity.
