@@ -96,7 +96,8 @@ ProgramData plugin folder, depending on the layout used.
 REQUIREMENTS
 
 Windows x64, OBS Studio x64, and the Microsoft Visual C++ x64 runtime.
-Tested with OBS 31.1.1 and OBS 32.2.1. The downloads are unsigned.
+Tested with OBS 31.1.1 and OBS 32.2.1. Official Windows releases have a signed
+and timestamped plugin DLL, setup installer and uninstaller.
 Use OBS's own libobs, frontend API and Qt DLLs; do not copy development SDK
 libraries into an OBS installation.
 
