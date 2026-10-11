@@ -1,14 +1,19 @@
-VBAN STREAM 0.3.5 - MAC TEST BUILD
+VBAN STREAM 0.3.6 - MACOS STABLE RELEASE
 by ElkaSoft
 
 REQUIREMENTS
 macOS 13 or later, Apple Silicon or Intel, OBS Studio 31.1.1 or later.
 The same universal plugin contains both arm64 and x86_64 code.
-This is a test release. A real OBS session and sustained LAN audio test are required.
+Stable release. Unsigned installer; not Apple Developer ID signed or notarized.
+
+SETTINGS WINDOW
+The four tabs are VBAN Audio, VBAN Returns, Video inputs and OBS to VBAN Frame.
+Resize the window from its edges; each tab scrolls while OK, Apply and Cancel
+remain visible. Apply saves all tabs.
 
 INSTALL WITH THE PKG
 1. Quit OBS Studio.
-2. Open vban-stream-0.3.5-macos-universal-test.pkg and follow the installer.
+2. Open vban-stream-0.3.6-macos-universal.pkg and follow the installer.
 3. Install for your current user. The plugin goes here:
    ~/Library/Application Support/obs-studio/plugins/obs-vban-audio.plugin
 4. Restart OBS. Open Tools > VBAN Stream Settings.
@@ -18,10 +23,10 @@ MANUAL ZIP INSTALL
 2. In Finder, choose Go > Go to Folder and enter:
    ~/Library/Application Support/obs-studio/plugins
 3. Create the plugins folder if needed. Copy obs-vban-audio.plugin into it.
-   Keep the whole .plugin bundle intact. Replace an earlier test copy if present.
+   Keep the whole .plugin bundle intact. Replace an earlier copy if present.
 4. Restart OBS.
 
-MACOS APPROVAL FOR THIS TEST BUILD
+MACOS APPROVAL
 The plugin has an ad-hoc signature. The installer is not Developer ID signed or
 Apple notarized, so macOS may block it. If Installer is blocked, use the ZIP.
 After copying the plugin from this project's release, you can approve only this
@@ -76,7 +81,7 @@ numbered channel positions with OBS at 7.1, send eight channels and leave unused
 channels silent. Smaller layouts use OBS's normal surround conversion.
 
 SEND MONITOR RETURNS
-Open Tools > VBAN Stream Settings. Select the Mac's local sender address from the network
+Open Tools > VBAN Stream Settings > VBAN Returns. Select the Mac's local sender address from the network
 dropdown (for example en0 plus its IPv4 address), or leave automatic routing.
 Enable return 1 and/or return 2. Set the receiver's destination IPv4 address,
 UDP port, stream name, and PCM16 or PCM24. Set matching values on the receiver.

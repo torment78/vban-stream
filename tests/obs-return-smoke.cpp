@@ -39,6 +39,7 @@ static constexpr int integration_buffer_ms = 60;
 #include <stdexcept>
 #include <thread>
 #include "frontend-stub.hpp"
+#include "settings-layout-checks.hpp"
 static void check(bool ok,const char *message){if(!ok)throw std::runtime_error(message);}
 struct Sink {
     vban::net::Socket socket = vban::net::invalid;
@@ -176,6 +177,9 @@ int main(int argc,char **argv){
     frontend->action->trigger();app.processEvents();
     const auto dialogs=window.findChildren<QDialog*>();check(!dialogs.empty(),"Open settings");
     auto *dialog=dialogs.front();
+    check_settings_layout(dialog, root);
+    auto *tabs=dialog->findChild<QTabWidget *>("vban_tabs");
+    tabs->setCurrentIndex(1);dialog->resize(1040,700);app.processEvents();
     auto *buttons=dialog->findChild<QDialogButtonBox*>();
     auto set_return=[&](int i,bool enable){
         const auto prefix=QString("return_%1_").arg(i);

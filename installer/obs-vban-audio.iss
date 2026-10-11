@@ -48,6 +48,12 @@ SetupLogging=yes
 CloseApplications=no
 RestartApplications=no
 Uninstallable=yes
+#ifdef SignedUninstallerOutputDir
+SignedUninstaller=yes
+SignedUninstallerDir={#SignedUninstallerOutputDir}
+#else
+SignedUninstaller=no
+#endif
 UninstallFilesDir={app}\data\obs-plugins\obs-vban-audio
 CreateUninstallRegKey=IsStandard
 UninstallDisplayName=VBAN Stream {#AppVersion}

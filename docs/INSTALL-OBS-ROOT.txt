@@ -1,9 +1,9 @@
-VBAN Stream 0.3.5 - Installation and usage
+VBAN Stream 0.3.6 - Installation and usage
 
 INSTALLER (STANDARD OR PORTABLE OBS)
 
 1. Close all OBS Studio windows.
-2. Run vban-stream-0.3.5-windows-x64-setup.exe.
+2. Run vban-stream-0.3.6-windows-x64-setup.exe.
    Approve the Windows administrator prompt. Protected folders such as
    Program Files need administrator access.
 3. Select one option:
@@ -35,10 +35,10 @@ The plugin works with normal and portable OBS Studio on Windows x64.
 Both ZIP files contain the same plugin DLL, arranged for different install paths.
 Install only one copy.
 
-- vban-stream-0.3.5-obs-root.zip:
+- vban-stream-0.3.6-obs-root.zip:
   Merge into the OBS installation folder. Works with normal AND portable OBS.
 
-- vban-stream-0.3.5-windows-x64.zip:
+- vban-stream-0.3.6-windows-x64.zip:
   Copy the obs-vban-audio folder into C:\ProgramData\obs-studio\plugins
   for a normal OBS installation.
 
@@ -99,6 +99,20 @@ Windows x64, OBS Studio x64, and the Microsoft Visual C++ x64 runtime.
 Tested with OBS 31.1.1 and OBS 32.2.1. The downloads are unsigned.
 Use OBS's own libobs, frontend API and Qt DLLs; do not copy development SDK
 libraries into an OBS installation.
+
+SETTINGS WINDOW
+
+Open Tools > VBAN Stream Settings. The four tabs are:
+- VBAN Audio: eight incoming audio streams and the shared UDP listen port.
+- VBAN Returns: two outgoing monitor mixes.
+- Video inputs: two incoming pictures and their mouse controls.
+- OBS to VBAN Frame: send the OBS Program picture.
+
+Drag an edge or the lower-right corner to resize the window. On a small display,
+make it shorter or narrower and scroll within the selected tab. Wide tables can
+scroll sideways as well. Use the tab-bar arrows if all four titles do not fit.
+OK, Apply and Cancel stay below the scrolling content. Apply saves settings from
+all four tabs; switching tabs keeps your edits. Cancel discards unapplied edits.
 
 RECEIVE VIDEO IN OBS
 
@@ -184,7 +198,7 @@ periodically while you are selecting a stream.
 
 SEND THE OBS MONITOR MIX BACK
 
-1. Open Tools > VBAN Stream Settings > VBAN RETURNS.
+1. Open Tools > VBAN Stream Settings > VBAN Returns.
 2. In Send from this PC, select this OBS computer's LAN address and adapter.
    Select the address belonging to the computer, not its gateway/router.
    Automatic lets Windows choose the route.
@@ -337,7 +351,7 @@ Source stream selections are saved by OBS with the scene collection.
 
 VIDEO TRANSFER
 JPEG is compressed on the CPU. Quality 100 can produce large images, and each
-changing picture is sent as a complete JPEG. Version 0.3.5 spaces individual
+changing picture is sent as a complete JPEG. Version 0.3.6 spaces individual
 packets across the frame interval to reduce bursts at the receiver. JPEG file-size optimization
 retains the selected quality. Check actual playback and errors on the receiver.
 Mbps means megabits per second: 80 Mbps is about 10 megabytes per second.

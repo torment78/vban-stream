@@ -48,7 +48,7 @@ def validate():
     run("tar","-xzf",ROOT/"out/test-kit/test-kit.tar.gz","-C",ROOT)
     target=ROOT/"build_macos/validate"
     target.mkdir(parents=True,exist_ok=True)
-    archive=next(release.glob("*-universal-test.zip"))
+    archive=next(release.glob("*-macos-universal*.zip"))
     run("ditto","-x","-k",archive,target)
     payload=target/"VBAN Stream"
     bundle=payload/"obs-vban-audio.plugin"

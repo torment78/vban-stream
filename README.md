@@ -10,17 +10,19 @@ An independent plugin by **ElkaSoft** for OBS Studio.
 
 Receive named VBAN streams with 1–8 channels each directly in OBS. Send the OBS monitoring mix back to
 two computers, each with its own destination address, UDP port, and stream name.
-The 0.3.5 development release receives two VBAN-Frame video feeds, such as a
+VBAN Stream receives two VBAN-Frame video feeds, such as a
 VoiceMeeter App View or a remote display, and adds Ctrl-click mouse return from
 OBS Program in Studio Mode. It also sends the live Program picture to a
-VBAN-Frame receiver. Windows x64 and universal Mac test installers are available.
+VBAN-Frame receiver. Windows x64 and universal Mac installers are available.
 
-[**Windows installer — stable 0.2.2**](https://github.com/torment78/vban-stream/releases/download/v0.2.2/obs-vban-audio-0.2.2-windows-x64-setup.exe)
- · [Windows installer — development 0.3.5](https://github.com/torment78/vban-stream/releases/download/v0.3.5/vban-stream-0.3.5-windows-x64-setup.exe)
- · [Mac installer — development 0.3.5](https://github.com/torment78/vban-stream/releases/download/v0.3.5/vban-stream-0.3.5-macos-universal-test.pkg)
+[**Windows installer — stable 0.3.6**](https://github.com/torment78/vban-stream/releases/download/v0.3.6/vban-stream-0.3.6-windows-x64-setup.exe)
+ · [Mac installer — stable 0.3.6](https://github.com/torment78/vban-stream/releases/download/v0.3.6/vban-stream-0.3.6-macos-universal.pkg)
+ · [Release page](https://github.com/torment78/vban-stream/releases/tag/v0.3.6)
  · [Download all banners](https://github.com/torment78/vban-stream/releases/download/v0.3.5/VBAN-Stream-artwork-0.3.5.zip)
- · [Installation guide](https://github.com/torment78/vban-stream/releases/download/v0.3.5/VBAN-INSTALL.txt)
+ · [Installation guide](https://github.com/torment78/vban-stream/releases/download/v0.3.6/VBAN-INSTALL.txt)
  · [Report an issue](https://github.com/torment78/vban-stream/issues)
+
+Windows: **digitally signed and timestamped**. Mac: **unsigned installer / not notarized**.
 
 [![Donate on Ko-fi](https://img.shields.io/badge/Donate-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/msffixit)
 
@@ -28,36 +30,41 @@ Free and open source under GPL-2.0-or-later. Donations support development and a
 
 [Choose from eight banners](docs/ARTWORK.md) — circuit or waves designs, horizontal or vertical, with or without the VoiceMeeter / VB-Audio credit.
 
+## What's new in 0.3.6
+
+The settings window now has four tabs: **VBAN Audio**, **VBAN Returns**, **Video inputs**
+and **OBS to VBAN Frame**. Resize it from its edges or lower-right corner. Each tab
+scrolls when space is limited, while OK, Apply and Cancel stay visible. Switching
+tabs preserves edits and Apply saves all tabs. Existing settings are preserved.
+
 ## Download and install
 
-The Windows and Mac development builds are **0.3.5**. The latest stable version is **0.2.2** and retains the earlier VBAN Audio name. Tested with **OBS 31.1.1** and **OBS 32.2.1** on Windows x64.
+**0.3.6 is the stable release.** Use the setup installer for your platform.
 
-Use the setup installer for both stable and development builds.
+| Installer | Platform | Signing |
+| --- | --- | --- |
+| [Windows setup](https://github.com/torment78/vban-stream/releases/download/v0.3.6/vban-stream-0.3.6-windows-x64-setup.exe) | Windows x64; standard or portable OBS | Authenticode signed and timestamped, including the DLL and uninstaller |
+| [Mac installer](https://github.com/torment78/vban-stream/releases/download/v0.3.6/vban-stream-0.3.6-macos-universal.pkg) | macOS 13+; Apple Silicon and Intel | Unsigned / not notarized |
 
-| Installer | Version and platform |
-| --- | --- |
-| [Windows stable setup](https://github.com/torment78/vban-stream/releases/download/v0.2.2/obs-vban-audio-0.2.2-windows-x64-setup.exe) | 0.2.2, Windows x64, standard or portable OBS |
-| [Windows development setup](https://github.com/torment78/vban-stream/releases/download/v0.3.5/vban-stream-0.3.5-windows-x64-setup.exe) | 0.3.5 pre-release, Windows x64, standard or portable OBS |
-| [Mac development installer](https://github.com/torment78/vban-stream/releases/download/v0.3.5/vban-stream-0.3.5-macos-universal-test.pkg) | 0.3.5 pre-release, Apple Silicon and Intel |
+Requires **OBS Studio 31.1.1 or later**. Windows builds are tested with OBS 31.1.1
+and 32.2.1. Mac builds run automated native checks on Apple Silicon and Intel.
+Source code is available on GitHub; release downloads contain ready-to-install packages.
 
-Source code and optional manual packages are available separately on GitHub.
+### macOS installation
 
-### macOS test build
+Quit OBS, then open the [Mac installer](https://github.com/torment78/vban-stream/releases/download/v0.3.6/vban-stream-0.3.6-macos-universal.pkg).
+It installs for your current user into `~/Library/Application Support/obs-studio/plugins`.
 
-The [0.3.5 Mac pre-release](https://github.com/torment78/vban-stream/releases/tag/v0.3.5)
-is for testing on **macOS 13 or later**, with **OBS Studio 31.1.1 or later**.
-The universal `.plugin` bundle contains both Apple Silicon and Intel code.
-
-Use the [Mac setup installer](https://github.com/torment78/vban-stream/releases/download/v0.3.5/vban-stream-0.3.5-macos-universal-test.pkg). It installs into
-`~/Library/Application Support/obs-studio/plugins`. Quit OBS before installation.
-These test builds use ad-hoc signing and are not Apple notarized; the
-[Mac installation and testing guide](https://github.com/torment78/vban-stream/releases/download/v0.3.5/INSTALL-MAC.txt) explains approval and
-includes a listening checklist. Sustained audio and real OBS GUI testing are still
-required before promoting Mac support to a stable release.
+**Stable — unsigned / not notarized.** The plugin uses an ad-hoc signature for
+macOS loading, but neither it nor the installer has an Apple Developer ID signature.
+See the [Mac installation guide](https://github.com/torment78/vban-stream/releases/download/v0.3.6/INSTALL-MAC.txt)
+for approval instructions and an optional manual ZIP fallback. Automated checks
+cover both processor types; LAN performance and VoiceMeeter interoperability
+should also be checked on your own setup before a live production.
 
 ### Using the Windows installer
 
-1. Close OBS, run **vban-stream-0.3.5-windows-x64-setup.exe**, and approve the Windows administrator prompt.
+1. Close OBS, run **vban-stream-0.3.6-windows-x64-setup.exe**, and approve the Windows administrator prompt.
 2. Choose **Standard OBS installation** (selected by default) or **Portable OBS**.
 3. Check the detected standard OBS folder, or click **Browse** to choose your portable
    OBS root: the folder containing **bin**, **data**, and **obs-plugins**.
@@ -94,7 +101,7 @@ The ZIPs also include **VBAN-INSTALL.txt**.
 
 Requires the Microsoft Visual C++ x64 runtime. Uses the OBS installation's own
 libobs, frontend API and Qt libraries. Do not copy development dependency DLLs
-into OBS. These builds are unsigned.
+into OBS. The official Windows plugin DLL is digitally signed.
 
 ## Receive VBAN audio in OBS
 
@@ -227,7 +234,7 @@ Avoid including the received copy in the same outgoing Program scene.
 
 ## Send the monitor mix back
 
-1. Open **VBAN RETURNS** in the same settings window.
+1. Open the **VBAN Returns** tab in the settings window.
 2. Under **Send from this PC**, select this OBS computer's LAN address and adapter.
    **Automatic** lets Windows select the route.
 3. Enable Return 1 and/or Return 2. Choose **PCM 16-bit** or **PCM 24-bit** for each

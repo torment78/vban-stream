@@ -1,4 +1,4 @@
-param([string]$SetupPath = '', [string]$ExpectedDllPath = '')
+param([string]$SetupPath = '', [string]$ExpectedDllPath = '', [switch]$RequireSigned)
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path $PSScriptRoot -Parent
 $version = (Get-Content -LiteralPath (Join-Path $repoRoot 'buildspec.json') -Raw | ConvertFrom-Json).version
@@ -16,6 +16,18 @@ $checks = 0
 function Assert-Check([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
     $script:checks++
+}
+function Assert-Signed([string]$Path) {
+    $signature = Get-AuthenticodeSignature -LiteralPath $Path
+    Assert-Check ($signature.Status -eq 'Valid') "Invalid signature: $Path"
+    Assert-Check ($null -ne $signature.TimeStamperCertificate) "Missing timestamp: $Path"
+    Assert-Check ($signature.SignerCertificate.Thumbprint -eq $script:expectedSigner) "Unexpected signer: $Path"
+}
+if ($RequireSigned) {
+    $script:expectedSigner = (Get-AuthenticodeSignature -LiteralPath $expectedDll).SignerCertificate.Thumbprint
+    Assert-Check (-not [string]::IsNullOrWhiteSpace($script:expectedSigner)) 'Reference DLL must be signed.'
+    Assert-Signed $expectedDll
+    Assert-Signed $SetupPath
 }
 function Run-Setup([string]$Mode, [string]$Root, [string]$Label, [bool]$ExpectSuccess) {
     $log = Join-Path $testRoot "$Label.log"
@@ -70,6 +82,11 @@ foreach ($mode in @('portable','standard')) {
         Assert-Check ((Get-FileHash -LiteralPath $dll).Hash -eq (Get-FileHash -LiteralPath $expectedDll).Hash) "$mode DLL differs from tested release."
         foreach ($asset in @('locale\en-US.ini','vban-audio.png','LICENSE.txt','VBAN-INSTALL.txt','unins000.exe')) {
             Assert-Check (Test-Path -LiteralPath (Join-Path $dataDir $asset)) "$mode missing $asset"
+        }
+        if ($RequireSigned) {
+            Assert-Signed $dll
+            Assert-Signed (Join-Path $dataDir 'unins000.exe')
+            Copy-Item -LiteralPath (Join-Path $dataDir 'unins000.exe') -Destination (Join-Path $testRoot "$mode-signed-uninstaller.exe")
         }
         Assert-Check ((Test-Path -LiteralPath $regKey) -eq ($mode -eq 'standard')) "$mode uninstall registration is incorrect."
         if ($mode -eq 'standard') {

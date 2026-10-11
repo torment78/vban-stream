@@ -2,7 +2,8 @@ param(
     [string]$InnoCompiler = '',
     [ValidateSet('RelWithDebInfo','Release')][string]$Configuration = 'RelWithDebInfo',
     [string]$ExpectedDllPath = '',
-    [string]$OutputDirectory = ''
+    [string]$OutputDirectory = '',
+    [string]$SignedUninstallerDirectory = ''
 )
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path $PSScriptRoot -Parent
@@ -40,7 +41,11 @@ if ($payloadHash -ne (Get-FileHash -LiteralPath $builtDll -Algorithm SHA256).Has
 $script = Join-Path $repoRoot 'installer\obs-vban-audio.iss'
 $output = Join-Path $repoRoot 'dist'
 if ($OutputDirectory) { $output = [IO.Path]::GetFullPath($OutputDirectory) }
-& $InnoCompiler "/DAppVersion=$version" "/DPayloadDir=$stage" "/DOutputPath=$output" $script
+$compilerArguments = @("/DAppVersion=$version", "/DPayloadDir=$stage", "/DOutputPath=$output")
+if ($SignedUninstallerDirectory) {
+    $compilerArguments += "/DSignedUninstallerOutputDir=$([IO.Path]::GetFullPath($SignedUninstallerDirectory))"
+}
+& $InnoCompiler @compilerArguments $script
 if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed.' }
 $setup = Join-Path $output "vban-stream-$version-windows-x64-setup.exe"
 Get-FileHash -LiteralPath $setup -Algorithm SHA256 | Format-List

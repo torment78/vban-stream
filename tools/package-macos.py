@@ -56,14 +56,14 @@ def main():
     run("codesign", "--verify", "--strict", bundle)
     for name, source_name in (("INSTALL-MAC.txt", "docs/INSTALL-MAC.txt"), ("LICENSE", "LICENSE")):
         shutil.copy2(ROOT / source_name, payload / name)
-    build_info = ("VBAN Stream " + VERSION + " macOS test build\nCommit: " + output("git", "-C", ROOT, "rev-parse", "HEAD")
+    build_info = ("VBAN Stream " + VERSION + " macOS stable release\nCommit: " + output("git", "-C", ROOT, "rev-parse", "HEAD")
         + "\nArchitectures: arm64 + x86_64\nMinimum macOS: 13.0\nOBS SDK: 31.1.1\n"
           "Signature: ad-hoc; not Developer ID signed or notarized.\n"
-          "Real OBS GUI and sustained LAN listening tests are still required.\n\n" + dependencies + "\n")
+          "Automated Apple Silicon and Intel validation is provided separately; real-device LAN performance varies.\n\n" + dependencies + "\n")
     (payload / "BUILD-INFO.txt").write_text(build_info)
     manifest = {str(p.relative_to(payload)): digest(p) for p in sorted(payload.rglob("*")) if p.is_file() and not p.is_symlink()}
     (payload / "SHA256.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    archive = destination / ("vban-stream-" + VERSION + "-macos-universal-test.zip")
+    archive = destination / ("vban-stream-" + VERSION + "-macos-universal.zip")
     run("ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", payload, archive)
     # OBS 31+ scans the user's Application Support directory on both architectures.
     pkgroot = stage / "installer"
@@ -86,7 +86,7 @@ def main():
     distribution = stage / "Distribution.xml"
     distribution.write_text('''<?xml version="1.0" encoding="utf-8"?>
 <installer-gui-script minSpecVersion="1.0">
-  <title>VBAN Stream - Mac Test Build</title>
+  <title>VBAN Stream - macOS</title>
   <options hostArchitectures="arm64,x86_64" customize="never" allow-external-scripts="no"/>
   <domains enable_currentUserHome="true" enable_anywhere="false" enable_localSystem="false"/>
   <allowed-os-versions><os-version min="13.0"/></allowed-os-versions>
@@ -99,12 +99,12 @@ def main():
     resources = stage / "resources"
     resources.mkdir()
     (resources / "welcome.html").write_text("<html><body><h1>VBAN Stream</h1><p>by ElkaSoft</p>"
-        "<p>Mac test build " + VERSION + " for OBS Studio 31.1.1 or later. macOS 13 or later.</p>"
+        "<p>Stable Mac release " + VERSION + " for OBS Studio 31.1.1 or later. macOS 13 or later.</p>"
         "<p>Quit OBS before installing. Installs for your current user in Library/Application Support/obs-studio/plugins.</p>"
         "<p>Eight audio inputs with up to eight channels each, two stereo monitor returns, two VBAN Frame inputs, two mouse-control routes, and OBS Program video output.</p>"
-        "<p>This test package uses ad-hoc signing and is not Apple notarized. Read INSTALL-MAC.txt before testing.</p>"
+        "<p>Unsigned installer; the plugin is ad-hoc signed, not Developer ID signed or Apple notarized. Read INSTALL-MAC.txt before installation.</p>"
         "<p><a href=\"https://elkasoft.xyz/\">ElkaSoft website</a></p></body></html>")
-    installer = destination / ("vban-stream-" + VERSION + "-macos-universal-test.pkg")
+    installer = destination / ("vban-stream-" + VERSION + "-macos-universal.pkg")
     run("productbuild", "--distribution", distribution, "--package-path", stage, "--resources", resources, installer)
     # Expand the final installer and compare the actual payload to the ZIP bundle.
     expanded = stage / "expanded"

@@ -24,6 +24,7 @@
 #include <QPushButton>
 #include <QSaveFile>
 #include <QScrollArea>
+#include <QScreen>
 #include <QSpinBox>
 #include <QTabWidget>
 #include <QTimer>
@@ -191,12 +192,28 @@ public:
         char *icon = obs_module_file("vban-audio.png");
         if (icon) { setWindowIcon(QIcon(QString::fromUtf8(icon))); bfree(icon); }
         setAttribute(Qt::WA_DeleteOnClose);
-        setMinimumWidth(900);
+        setSizeGripEnabled(true);
         auto *outer = new QVBoxLayout(this);
-        auto *tabs = new QTabWidget(this); tabs->setObjectName("vban_tabs"); outer->addWidget(tabs);
-        auto *audio_page = new QWidget(tabs);
-        auto *layout = new QVBoxLayout(audio_page);
-        tabs->addTab(audio_page, "Audio and returns");
+        auto *tabs = new QTabWidget(this);
+        tabs->setObjectName("vban_tabs");
+        tabs->setUsesScrollButtons(true);
+        tabs->setElideMode(Qt::ElideNone);
+        outer->addWidget(tabs, 1);
+        // Keep each page's content minimum inside its scroll area. Neither a wide
+        // input grid nor the tallest hidden tab may force the dialog off screen.
+        const auto add_page = [tabs](const char *title, const char *name) {
+            auto *scroll = new QScrollArea(tabs);
+            scroll->setObjectName(name);
+            scroll->setWidgetResizable(true);
+            scroll->setFrameShape(QFrame::NoFrame);
+            auto *page = new QWidget(scroll);
+            auto *page_layout = new QVBoxLayout(page);
+            page_layout->setSizeConstraint(QLayout::SetMinimumSize);
+            scroll->setWidget(page);
+            tabs->addTab(scroll, title);
+            return page_layout;
+        };
+        auto *layout = add_page("VBAN Audio", "audio_settings_scroll");
         common_ = new QCheckBox("Use one sender IP for all audio streams", this);
         common_->setObjectName("common_ip"); common_->setChecked(initial.common_ip);
         layout->addWidget(common_);
@@ -250,8 +267,9 @@ public:
         auto *help = new QLabel("Stream names are case-sensitive (1–16 printable ASCII characters). "
             "Live status reflects the applied settings. Each stream can carry 1–8 input channels; OBS may downmix them to its output layout. "
             "Multiple OBS sources can select the same slot.", this);
-        help->setWordWrap(true); layout->addWidget(help);
-        auto *returns_box = new QGroupBox("VBAN RETURNS", this);
+        help->setWordWrap(true); layout->addWidget(help); layout->addStretch();
+        auto *returns_page_layout = add_page("VBAN Returns", "return_settings_scroll");
+        auto *returns_box = new QGroupBox("VBAN RETURNS", returns_page_layout->parentWidget());
         auto *returns_layout = new QVBoxLayout(returns_box);
         auto *network_form = new QFormLayout;
         return_local_ = new QComboBox(returns_box);
@@ -328,15 +346,11 @@ public:
             "Use Monitor Only or Monitor and Output in OBS to include a source. "
             "Do not route the returns back into the VBAN feeds entering OBS.", returns_box);
         return_help->setWordWrap(true); returns_grid->addWidget(return_help, 3, 0, 1, 7);
-        layout->addWidget(returns_box);
-        auto *video_scroll = new QScrollArea(tabs);
-        video_scroll->setObjectName("video_settings_scroll");
-        video_scroll->setWidgetResizable(true); video_scroll->setFrameShape(QFrame::NoFrame);
-        auto *video_page = new QWidget(video_scroll);
-        auto *video_layout = new QVBoxLayout(video_page);
-        video_scroll->setWidget(video_page); tabs->addTab(video_scroll, "Video inputs");
+        returns_page_layout->addWidget(returns_box); returns_page_layout->addStretch();
+        auto *video_layout = add_page("Video inputs", "video_settings_scroll");
+        auto *video_page = video_layout->parentWidget();
         auto *video_help = new QLabel("Receive two VBAN-Frame streams from VoiceMeeter, Matrix or another compatible sender. "
-            "Choose App View or a display and JPEG/PNG on the sender. Send to this PC using the UDP listen port on the Audio and returns tab. "
+            "Choose App View or a display and JPEG/PNG on the sender. Send to this PC using the UDP listen port on the VBAN Audio tab. "
             "After Apply, add a VBAN Video source and select one of these inputs.", video_page);
         video_help->setWordWrap(true); video_layout->addWidget(video_help);
         auto *mouse_network = new QFormLayout;
@@ -401,8 +415,8 @@ public:
             "Mouse control supports ordinary scene cropping, scaling and rotation. Filtered sources and Crop to Bounding Box are not interactive. "
             "Control stops on video loss, scene changes or released Ctrl. Keyboard typing and mouse wheel are not forwarded.", video_page);
         video_note->setWordWrap(true); video_layout->addWidget(video_note); video_layout->addStretch();
-        auto *output_page = new QWidget(tabs);auto *output_layout = new QVBoxLayout(output_page);
-        tabs->addTab(output_page, "OBS to VBAN Frame");
+        auto *output_layout = add_page("OBS to VBAN Frame", "output_settings_scroll");
+        auto *output_page = output_layout->parentWidget();
         auto *output_help = new QLabel("Send the OBS Program picture to VBAN-Screen or another VBAN-Frame receiver. "
             "This follows your live Program scene, including scene switches and transitions, without the OBS controls. "
             "In Studio Mode, editing Preview does not change the outgoing picture until you transition it to Program.", output_page);
@@ -461,6 +475,13 @@ public:
         connect(timer, &QTimer::timeout, this, [this] { refresh(); });
         timer->start(500);
         update_mode(); refresh();
+        // The action buttons stay outside the scrolling pages at every size.
+        outer->activate();
+        setMinimumSize(QSize(560, 360).expandedTo(minimumSizeHint()));
+        QSize opening_size(1040, 700);
+        if (const auto *display = screen())
+            opening_size = opening_size.boundedTo(display->availableGeometry().size() - QSize(48, 80));
+        resize(opening_size.expandedTo(minimumSize()));
     }
 private:
     void update_mode() {

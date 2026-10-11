@@ -26,6 +26,7 @@
 #include <iostream>
 #include <stdexcept>
 #include "frontend-stub.hpp"
+#include "settings-layout-checks.hpp"
 
 static void check(bool value,const char *message) { if(!value) throw std::runtime_error(message); }
 static std::atomic<int> captures{0};
@@ -146,6 +147,7 @@ int main(int argc,char **argv) {
         auto dialogs=window.findChildren<QDialog*>();
         check(!dialogs.empty(),"Settings dialog opens");
         auto *dialog=dialogs.front();
+        check_settings_layout(dialog, root);
         auto *stream=dialog->findChild<QLineEdit*>("stream_0");
         auto *common=dialog->findChild<QCheckBox*>("common_ip");
         auto *individual=dialog->findChild<QLineEdit*>("sender_0");
@@ -206,8 +208,8 @@ int main(int argc,char **argv) {
         check(obs_property_list_item_count(obs_properties_get(video_props,"slot"))==2, "Configured video slot appears in source picker");
         obs_properties_destroy(video_props);
         auto *tabs=dialog->findChild<QTabWidget *>("vban_tabs");check(tabs,"Video tab exists");
-        tabs->setCurrentIndex(1);app.processEvents();dialog->grab().save(root+"/video-settings-dialog.png");
-        check(tabs->count()==3 && tabs->tabText(2)=="OBS to VBAN Frame","Mouse controls share Video inputs; third tab sends Program");
+        tabs->setCurrentIndex(2);app.processEvents();dialog->grab().save(root+"/video-settings-dialog.png");
+        check(tabs->count()==4 && tabs->tabText(3)=="OBS to VBAN Frame","Mouse controls share Video inputs; fourth tab sends Program");
         check(mouse_enable->parentWidget()->parentWidget()==video_enabled->parentWidget(),"Video 1 owns its mouse control card");
         auto *mouse_second=dialog->findChild<QCheckBox *>("mouse_1_enabled");
         check(mouse_second && mouse_second->parentWidget()->parentWidget()==video_second->parentWidget(),"Video 2 owns its mouse control card");
@@ -215,7 +217,7 @@ int main(int argc,char **argv) {
         check(video_scroll,"Video and mouse setup can scroll on smaller screens");
         video_scroll->verticalScrollBar()->setValue(video_scroll->verticalScrollBar()->maximum());
         app.processEvents();dialog->grab().save(root+"/mouse-settings-dialog.png");
-        tabs->setCurrentIndex(2);app.processEvents();dialog->grab().save(root+"/program-output-settings-dialog.png");
+        tabs->setCurrentIndex(3);app.processEvents();dialog->grab().save(root+"/program-output-settings-dialog.png");
         auto *output_enabled=dialog->findChild<QCheckBox *>("frame_output_enabled");
         check(output_enabled && !output_enabled->isChecked(),"Program output is disabled for old settings");
         auto *adaptive=dialog->findChild<QCheckBox *>("frame_output_adaptive");

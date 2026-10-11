@@ -1,4 +1,4 @@
-name: macOS test build
+name: macOS universal build
 on:
   workflow_dispatch:
   # Run manually once the Windows functionality is ready for Mac validation.
@@ -38,8 +38,8 @@ jobs:
           name: vban-stream-macos-test
           # Explicit files keep stale source archives out of user downloads.
           path: |
-            dist/macos/*-universal-test.pkg
-            dist/macos/*-universal-test.zip
+            dist/macos/*-macos-universal*.pkg
+            dist/macos/*-macos-universal*.zip
             dist/macos/INSTALL-MAC.txt
             dist/macos/BUILD-INFO.txt
             dist/macos/SHA256SUMS-macos.txt
