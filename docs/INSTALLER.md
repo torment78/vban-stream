@@ -45,10 +45,9 @@ assets. Defaults still compare against the Visual Studio build and output to `di
 The 25 September 2026 dark preview is in `dist/installer-dark-preview` and uses
 the original published 0.2.4 payload. It passed all 53 installer checks; logs are
 under `build_installer/test-d82dac9bae8940bda1a8a4ba2ff4fcd1` and
-`build_installer/dark-preview-tests.log`. Desktop visual inspection could not run:
-the Computer Use runtime failed to initialize with `apply deny-read ACLs` on both
-attempts. Visible layout, high-DPI appearance and interactive browsing remain
-unverified. No GitHub release asset was replaced.
+`build_installer/dark-preview-tests.log`. Desktop visual inspection was not
+performed for this preview. Visible layout, high-DPI appearance and interactive
+browsing remain unverified. No GitHub release asset was replaced.
 
 ## Installation behavior
 
@@ -111,10 +110,10 @@ The tested DLL SHA256 is
 `13E2038DA48C07D7EE71B4415778B6B41B44259DEC014A219876E25899DA655E`.
 
 The administrator consent dialog and writes to protected Program Files folders
-are not exercised by these non-elevated tests. Desktop UI inspection was
-unavailable because the computer-use runtime failed to initialize. Silent tests
-exercise the same wizard validation and installation/uninstallation code, but do
-not verify visible text layout or interactive folder browsing.
+are not exercised by these non-elevated tests. Desktop UI inspection was not
+performed during these checks. Silent tests exercise the same wizard validation
+and installation/uninstallation code, but do not verify visible text layout or
+interactive folder browsing.
 
 [Inno Setup privilege documentation](https://jrsoftware.org/ishelp/topic_setup_privilegesrequired.htm)
 and [script event documentation](https://jrsoftware.org/ishelp/topic_scriptevents.htm).
