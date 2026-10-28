@@ -72,9 +72,3 @@ The original artwork remains beside the new files in `docs/images`; the new set 
 | Waves — horizontal — without credit | 1774 × 887 | [JPEG (243.0 KB)](images/waves-wide-untagged.jpg) | [PNG](images/waves-wide-untagged.png) |
 | Waves — vertical — with credit | 941 × 1672 | [JPEG (258.3 KB)](images/waves-vertical-tagged.jpg) | [PNG](images/waves-vertical-tagged.png) |
 | Waves — vertical — without credit | 941 × 1672 | [JPEG (251.8 KB)](images/waves-vertical-untagged.jpg) | [PNG](images/waves-vertical-untagged.png) |
-
-## Creation
-
-The eight existing PNGs were edited individually with the built-in imagegen tool, changing the feature copy to two rows while retaining the established backgrounds, logo, title and credits. The JPEGs are full-resolution compressed exports of those edited PNGs. Application and installer icons are separate and unchanged.
-
-See the [complete edit prompts](ARTWORK-PROMPTS.md#035-feature-update) and [icon documentation](ICON.md).
